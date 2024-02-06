@@ -1,0 +1,48 @@
+# SPEC7 SNMP Control Application
+
+This Python application allows users to interact with a SPEC7 board using SNMP (Simple Network Management Protocol) for performing get and set requests.
+It consists of three main parts:
+
+1. **setup.py**: This script needs to be run first to install all the necessary dependencies. 
+It handles the installation of Linux dependencies such as `snmp-mibs-downloader`, `libxcb-cursor0`, and Python dependencies including `pysnmp`, `pysmi`, and `PyQt6`.
+
+2. **gui.py**: This script is responsible for creating an interactive graphical user interface (GUI) for the application. 
+Once the setup is complete, users can simply run this script to access the GUI and interact with the SPEC7 board.
+
+3. **backend.py**: This script contains the functionality for handling SNMP get and set requests. 
+It serves as the backend for the GUI, enabling users to send SNMP requests to the SPEC7 board.
+
+## Installation and Setup
+
+To set up the application, follow these steps:
+
+1. Clone or download the repository to your local machine.
+
+2. Open a terminal window and navigate to the directory containing the repository.
+
+3. Run the `setup.py` script to install the necessary dependencies:
+
+    ```bash
+    python setup.py
+    ```
+
+4. Once the setup is complete, you can run the `gui.py` script to launch the GUI:
+
+    ```bash
+    python gui.py
+    ```
+
+5. Use the GUI interface to interact with the SPEC7 board, sending SNMP get and set requests as needed.
+
+## Requirements
+
+- Python 3.x
+- Linux environment (for `snmp-mibs-downloader`)
+- `pysnmp` package
+- `PyQt6` package
+
+## Usage
+
+- Run `setup.py` to install dependencies.
+- Run `backend.py` to launch the GUI interface.
+- Use the GUI to send SNMP get and set requests to the SPEC7 board.

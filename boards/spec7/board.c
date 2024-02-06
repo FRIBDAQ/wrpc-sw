@@ -33,17 +33,11 @@
 #include "storage.h"
 #include "softpll_ng.h"
 #include <wrpc.h>
+#include "lib/snmp.h"
 
 static spll_gain_schedule_t spll_main_ocxo_gain_sched;
 
-struct
-{
-    struct gpio_device gpio_aux;
-    struct spi_bus spi_ltc6950;
-    struct ltc695x_device ltc6950_pll;
-    struct pca9554_gpio_device gpio_tim_main_board;
-    int pll_wr_mode;
-} board;
+struct spec7_board board;
 
 static struct gpio_pin pin_pll_cs_n_o        = { &board.gpio_aux, 0 };
 static struct gpio_pin pin_pll_mosi_o        = { &board.gpio_aux, 1 };
@@ -167,7 +161,6 @@ void gpio_control_init()
 {
     int i;
     uint8_t io_stat;
-
     board_dbg("Initializing GPIO control...\n");
     pca9554_write_reg(&board.gpio_tim_main_board, PCA9554_REG_CONFIG, 0x00);  // Configure all IO as output
     pca9554_write_reg(&board.gpio_tim_main_board, PCA9554_REG_OUT, 0x00);     // LEDs, SEL_GROUP_0/1 and SEL_IRIG_B all '0'
@@ -285,6 +278,73 @@ int pll_sync(void)
     return 1;
 }
 
+#if defined(CONFIG_SNMP) && defined(SNMP_SET)
+/* Functions and struct used by the SNMP protocol to control the timing output */
+const struct snmp_oid oid_array_wrpcBoardSpecificGroup[] = {
+	OID_FIELD_VAR(   oid_wrpcSelGroup0,  get_select_group, set_select_group, ASN_INTEGER,   &(board.gpio_tim_main_board)),
+	OID_FIELD_VAR(   oid_wrpcSelGroup1,  get_select_group, set_select_group, ASN_INTEGER,   &(board.gpio_tim_main_board)),
+	{ 0, }
+};
+
+int set_select_group(uint8_t *buf, struct snmp_oid *obj){
+    static const int sel_group_offset = 3;
+	uint8_t io_stat;
+	uint8_t len = buf[1];
+	uint8_t *oid_data = buf + 2;
+	uint8_t sel_group = *(buf - 2) + sel_group_offset;  // add offset to get the appropriate value from board.h
+	uint8_t sel_group_reg = WBGEN2_GEN_MASK(sel_group, 1);
+	uint8_t asn_incoming = buf[0];
+	uint8_t asn_expected = obj->asn;
+	uint32_t tmp_u32;
+
+	if (asn_incoming != asn_expected) { /* wrong data type */
+		snmp_verbose("%s: wrong asn 0x%02x, expected 0x%02x\n",
+			     __func__, asn_incoming, asn_expected);
+		return -SNMP_ERR_BADVALUE;
+	}
+	
+	io_stat = pca9554_read_reg(obj->p, PCA9554_REG_OUT);
+
+	memcpy(&tmp_u32, oid_data, len);
+	tmp_u32 = ntohl(tmp_u32);
+	/* move data when shorter than 4 bytes */
+	tmp_u32 = tmp_u32 >> ((4 - len) * 8);
+
+	if(tmp_u32){		
+		pca9554_write_reg(obj->p, PCA9554_REG_OUT, io_stat | sel_group_reg);
+	}
+	else{
+		pca9554_write_reg(obj->p, PCA9554_REG_OUT, io_stat & ~sel_group_reg);
+	}
+
+	return len + 2;
+}
+
+int get_select_group(uint8_t *buf, struct snmp_oid *obj){
+    static const int sel_group_offset = 3;
+	uint8_t *oid_data = buf + 2;
+	uint8_t *len = &buf[1];
+	uint32_t on = htonl(1);
+	uint32_t off = htonl(0);
+	uint8_t sel_group = *(buf - 2) + sel_group_offset; // add offset to get the appropriate value from board.h
+	uint8_t reg_stat = pca9554_read_reg(obj->p, PCA9554_REG_OUT);
+	uint8_t sel_group_reg = WBGEN2_GEN_MASK(sel_group, 1);
+	uint8_t sel_group_status = reg_stat & sel_group_reg;
+
+	*len = sizeof(uint32_t);
+	buf[0] = obj->asn;
+	if(sel_group_status){
+		memcpy((char*)oid_data, &on, *len);
+	}
+	else{
+		memcpy((char*)oid_data, &off, *len);
+	}
+
+	return *len + 2;
+}
+
+#endif
+
 int spec7_init()
 {
     /* most of the I/Os of the slow peripherals (i2c, spi) are bitbanged. First, let's
@@ -311,7 +371,6 @@ int spec7_init()
 
     /* Setup the SoftPLL for the OCXO we have */
     spec7_spll_setup();
-
     ltc695x_init(&board.ltc6950_pll, &board.spi_ltc6950);
 
     // Reset the PLL (RES6950 clears itself)
@@ -376,9 +435,6 @@ int wrc_board_init()
 	board_dbg("MAC addr: %x:%x:%x:%x:%x:%x\n",mac_addr[0],mac_addr[1],mac_addr[2],mac_addr[3],mac_addr[4],mac_addr[5]);
 	ep_set_mac_addr(&wrc_endpoint_dev, mac_addr);
 	ep_pfilter_init_default(&wrc_endpoint_dev);
-
-    pca9554_write_reg(&board.gpio_tim_main_board, PCA9554_REG_CONFIG, 0x00);  // Configure all IO as output
-    pca9554_write_reg(&board.gpio_tim_main_board, PCA9554_REG_OUT, 0x00);     // LEDs, SEL_GROUP_0/1 and SEL_IRIG_B all '0'
 
     return 0;
 }

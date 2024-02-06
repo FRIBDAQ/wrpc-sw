@@ -9,7 +9,7 @@
 #include "dev/gpio.h"
 #include "dev/ltc695x.h"
 #include "dev/pca9554.h"
-
+#include "lib/snmp.h"
 /*
  * This is meant to be automatically included by the Makefile,
  * when wrpc-sw is build for wrc (node) -- as opposed to wrs (switch)
@@ -70,7 +70,8 @@
 /* I2C address of the Unique ID EEPROM and Unique ID address */
 #define UID_EEPROM_ADR 0x51
 #define UID_OFFSET 0xfa
-
+/* macro for extended SNMP support on the SPEC7 board */
+#define CONFIG_SNMP_BOARD_SPECIFIC
 /* I2C address of the I2C multiplexer */
 #define PCA9554_ADR 0x23
 
@@ -86,10 +87,21 @@
 #define SDBFS_REC 5
 
 // PLL WR_MODE options:
-#  define PLL_WR_MODE_MASTER 1
-#  define PLL_WR_MODE_SLAVE 2
-#  define PLL_WR_MODE_GM 3
- 
+#define PLL_WR_MODE_MASTER 1
+#define PLL_WR_MODE_SLAVE 2
+#define PLL_WR_MODE_GM 3
+
+struct spec7_board
+{
+    struct gpio_device gpio_aux;
+    struct spi_bus spi_ltc6950;
+    struct ltc695x_device ltc6950_pll;
+    struct pca9554_gpio_device gpio_tim_main_board;
+    int pll_wr_mode;
+};
+
+extern struct spec7_board board;
+
 void gpio_control_init(void);
 int gpio_control_poll(void);
 void board_pre_pll_lock(int pll_wr_mode);
@@ -102,5 +114,17 @@ extern int phy_calibration_done(void);
 
 void sdb_find_devices(void);
 void sdb_print_devices(void);
+
+#if defined(CONFIG_SNMP) && defined(SNMP_SET)
+int set_select_group(uint8_t *buf, struct snmp_oid *obj);
+int get_select_group(uint8_t *buf, struct snmp_oid *obj);
+/* wrpcSelGroup entries */
+static const uint8_t oid_wrpcSelGroup0[] =           {1,0};
+static const uint8_t oid_wrpcSelGroup1[] =           {2,0};
+/* oid_wprcBoardSpecific*/
+static const uint8_t oid_wrpcBoardSpecificGroup[] =    {0x2B,6,1,4,1,96,101,1,13};
+/* wrpcBoardSpecificGroup array */
+extern const struct snmp_oid oid_array_wrpcBoardSpecificGroup[];
+#endif
 
 #endif /* __BOARD_SPEC7_H */
