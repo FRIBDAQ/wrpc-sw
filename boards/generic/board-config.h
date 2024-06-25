@@ -78,7 +78,7 @@
 #define FMC_EEPROM_ADR 0x50
 
 /* However it is not used. */
-#define EEPROM_STORAGE 0
+#define EEPROM_STORAGE 1
 
 
 #endif /* __BOARD_CONFIG_GENERIC_H */
