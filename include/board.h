@@ -45,6 +45,8 @@
 #  include "boards/sis8300ku/board.h"
 #elif defined(CONFIG_TARGET_PXIE_FMC)
 #  include "boards/pxie-fmc/board-config.h"
+#elif defined(CONFIG_TARGET_KR260)
+#  include "boards/kr260/board-config.h"
 #elif defined(CONFIG_TARGET_WR2RF_VME)
 #  include "boards/wr2rf-vme/board-config.h"
 #else

@@ -19,6 +19,7 @@ obj-$(CONFIG_TARGET_ERTM14) += \
 	boards/ertm14/sdbfs-custom-image.o
 
 obj-$(CONFIG_TARGET_PXIE_FMC) += boards/pxie-fmc/board.o
+obj-$(CONFIG_TARGET_KR260) += boards/kr260/board.o
 obj-$(CONFIG_TARGET_WR2RF_VME) += boards/wr2rf-vme/board.o  boards/wr2rf-vme/sdbfs-custom-image.o boards/ertm14/phy_calibration.o
 
 boards/ertm14/sdbfs-custom-image.o: boards/ertm14/sdbfs-custom-image.h
