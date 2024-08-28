@@ -78,6 +78,11 @@ config TARGET_PXIE_FMC
 	help
 	  PXIe FMC Carrier (Zynq Ultrascale+)
 
+config TARGET_KR260
+	bool "ZU7 KR260 Carrier"
+	help
+	  KR260 Carrier (Zynq Ultrascale+)
+
 config TARGET_WR2RF_VME
 	bool "WR2RF-VME Board"
 	help

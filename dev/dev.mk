@@ -85,6 +85,8 @@ obj-$(CONFIG_TARGET_ERTM14) += \
 obj-$(CONFIG_TARGET_PXIE_FMC) += \
 				dev/24aa025.o \
 
+obj-$(CONFIG_TARGET_KR260) += \
+
 obj-$(CONFIG_TARGET_WR2RF_VME) += \
 				dev/24aa025.o \
 
