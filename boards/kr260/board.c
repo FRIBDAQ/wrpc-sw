@@ -11,11 +11,13 @@
 #include "dev/i2c_eeprom.h"
 #include "dev/syscon.h"
 #include "dev/endpoint.h"
+#include "dev/24aa256.h"
 #include "storage.h"
 #include "wrc-debug.h"
 
 static struct i2c_bus i2c_wrc_eeprom;
 static struct i2c_eeprom_device wrc_eeprom_dev;
+static struct m24aa256_device mac_id_eeprom;
 
 int wrc_board_early_init()
 {
@@ -36,11 +38,28 @@ int wrc_board_early_init()
 
 int wrc_board_init()
 {
+	uint8_t mac_addr[6];
+
 	/*
 	 * MAC address assignment
 	 */
-	board_dbg("Manually assigned MAC address used.\n");
-	uint8_t mac_addr[6] = {0x02, 0x51, 0x79, 0x08, 0x74, 0x97};
+	/* 1. Try reading from 24AA256E48T unique ID chip */
+	if (m24aa256_init(&mac_id_eeprom, &i2c_wrc_eeprom, MAC_CHIP_ADR)) {
+		board_dbg("Getting MAC address from Unique ID chip\n");
+		m24aa256_read_mac(&mac_id_eeprom, mac_addr);
+
+	/* 2. Try reading from configuration EEPROM */
+	} else if (storage_get_persistent_mac(0, mac_addr) == -1) {
+	/* 3. If everything fails, use default MAC */
+		board_dbg("Failed to get MAC address from Unique ID chip or EEPROM. \
+				Using fallback address.\n");
+		mac_addr[0] = 0x22;
+		mac_addr[1] = 0x33;
+		mac_addr[2] = 0x44;
+		mac_addr[3] = 0x55;
+		mac_addr[4] = 0x66;
+		mac_addr[5] = 0x77;
+	}
 
 	ep_set_mac_addr(&wrc_endpoint_dev, mac_addr);
 	ep_pfilter_init_default(&wrc_endpoint_dev);

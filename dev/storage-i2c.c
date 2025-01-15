@@ -28,8 +28,8 @@ void storage_i2ceeprom_create(struct storage_device *dev, struct i2c_eeprom_devi
 	dev->name = "i2c-eeprom";
 	dev->priv = eeprom;
 	dev->rwops = &i2c_eeprom_rwops;
-	dev->size = 8192;
+	dev->size = 229376;
 	dev->cfg_entry = 0;
-	dev->block_size = 32;
+	dev->block_size = 64;
 	dev->entry_points = i2c_eeprom_default_entry_points;
 }
