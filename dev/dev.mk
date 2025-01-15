@@ -80,6 +80,7 @@ obj-$(CONFIG_TARGET_PXIE_FMC) += \
 				dev/24aa025.o \
 
 obj-$(CONFIG_TARGET_KR260) += \
+				dev/24aa256.o \
 
 obj-$(CONFIG_TARGET_WR2RF_VME) += \
 				dev/24aa025.o \

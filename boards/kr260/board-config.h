@@ -43,8 +43,8 @@
 #define CONSOLE_UART_BAUDRATE 115200
 
 /* i2c eeproms address */
-#define CFG_EEPROM_ADR 0x51
-#define MAC_CHIP_ADR   0x52
+#define CFG_EEPROM_ADR 0x53
+#define MAC_CHIP_ADR   0x53
 
 #define SDBFS_REC 5
 
