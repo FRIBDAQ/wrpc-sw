@@ -367,8 +367,6 @@ void shell_boot_script(void)
 {
 	int next = 0;
 
-
-/*
 #ifdef CONFIG_INIT_COMMAND
 	while (1) {
 		cmd_len = build_init_readcmd((uint8_t *)cmd_buf,
@@ -379,26 +377,6 @@ void shell_boot_script(void)
 		shell_exec(cmd_buf);
 	}
 #endif
-  */
-
-//		shell_exec("vlan off");
-//		pp_printf("vlan off\n");
-		shell_exec("ptp stop");
-		pp_printf("ptp stop\n");
-		shell_exec("sfp erase");
-		pp_printf("sfp erase\n");
-		shell_exec("sfp add AXGE-1254-0531 180750 148326 1235332 333756144");
-		pp_printf("sfp add AXGE-1254-0531 180750 148326 1235332 333756144\n");
-		shell_exec("sfp add AXGE-3454-0531 180750 148326 -1235332 333756144");
-		pp_printf("sfp add AXGE-3454-0531 180750 148326 -1235332 333756144\n");
-		shell_exec("sfp add SFP-10GSR-85 180750 148326 -1235332 333756144");
-		pp_printf("sfp add SFP-10GSR-85 180750 148326 -1235332 333756144\n");
-		shell_exec("sfp match");
-		pp_printf("sfp match\n");
-		shell_exec("mode slave");
-		pp_printf("mode slave\n");
-		shell_exec("ptp start");
-		pp_printf("ptp start\n");
 
 	while (CONFIG_HAS_FLASH_INIT) {
 		cmd_len = storage_init_readcmd((uint8_t *)cmd_buf,
