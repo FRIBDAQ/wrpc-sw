@@ -35,7 +35,7 @@ static const char * const sdb_cmds[] =
 #if CONFIG_CMD_SDB_RDUMP
 static void cmd_sdb_rdump(unsigned off)
 {
-	struct storage_device *dev = wrc_sdbfs.dev;
+	struct storage_device *dev = wrc_storage_dev;
 	unsigned char buf[256];
 	unsigned i, j;
 	int res;

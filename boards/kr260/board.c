@@ -12,12 +12,14 @@
 #include "dev/syscon.h"
 #include "dev/endpoint.h"
 #include "dev/24aa256.h"
+#include "dev/si57x.h"
 #include "storage.h"
 #include "wrc-debug.h"
 
 static struct i2c_bus i2c_wrc_eeprom;
 static struct i2c_eeprom_device wrc_eeprom_dev;
 static struct m24aa256_device mac_id_eeprom;
+static struct wr_si57x_interface_device wrc_si570_dev;
 
 int wrc_board_early_init()
 {
@@ -32,6 +34,20 @@ int wrc_board_early_init()
 	 * Mount SDBFS filesystem from storage.
 	 */
 	storage_mount( &wrc_storage_dev );
+
+  wr_si57x_interface_init(&wrc_si570_dev, BASE_AUXWB, SI570_ADR);
+  si57x_reset(&wrc_si570_dev);
+  timer_delay_ms(10);
+
+  uint32_t f_xtal;
+  si57x_get_xtal_frequency(&wrc_si570_dev, 100000000, &f_xtal);
+
+  si57x_set_frequency(&wrc_si570_dev, f_xtal, 124975605, 0);
+  board_dbg("Si570: frequency set\n");
+
+  si57x_get_xtal_frequency(&wrc_si570_dev, 124975605, &f_xtal);
+  board_dbg("Wait 1 second for clock to settle ...\n");
+  timer_delay_ms(1000);
 
 	return 0;
 }

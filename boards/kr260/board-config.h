@@ -46,6 +46,9 @@
 #define CFG_EEPROM_ADR 0x53
 #define MAC_CHIP_ADR   0x53
 
+/* i2c si570 address */
+#define SI570_ADR 0x55
+
 #define SDBFS_REC 5
 
 #endif /* __BOARD_CONFIG_KR260_H */

@@ -98,7 +98,7 @@ void si57x_write( struct wr_si57x_interface_device *dev, uint8_t addr, uint8_t *
 	bb_i2c_stop( &dev->master );
 }
 
-void si57x_get_xtal_frequency( struct wr_si57x_interface_device *dev, uint32_t* freq_hz )
+void si57x_get_xtal_frequency( struct wr_si57x_interface_device *dev, uint32_t f0, uint32_t* freq_hz )
 {
 	uint8_t regs[16];
 
@@ -121,14 +121,13 @@ void si57x_get_xtal_frequency( struct wr_si57x_interface_device *dev, uint32_t* 
 		return;
 	}
 
-	uint64_t f0 = 100000000;
-	uint64_t f_xtal = (f0 * hs_div * n1 ) * ( 1ULL << 28 ) / rfreq;
+	uint64_t f_xtal_64 = ((uint64_t)f0 * hs_div * n1 ) * ( 1ULL << 28 ) / rfreq;
 
 
-	board_dbg("Si57x: xtal frequency = %d Hz\n", (int) f_xtal );
+	board_dbg("Si57x: xtal frequency = %llu Hz\n", f_xtal_64 );
 
 	if( freq_hz )
-		*freq_hz = f_xtal;
+		*freq_hz = f_xtal_64;
 
 }
 

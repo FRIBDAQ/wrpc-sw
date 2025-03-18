@@ -44,7 +44,7 @@ void si57x_gpio_set_dir(const struct gpio_pin *pin, int dir);
 int si57x_gpio_in(const struct gpio_pin *pin);
 void si57x_read( struct wr_si57x_interface_device *dev, uint8_t addr, uint8_t *data, int count );
 void si57x_write( struct wr_si57x_interface_device *dev, uint8_t addr, uint8_t *data, int count );
-void si57x_get_xtal_frequency( struct wr_si57x_interface_device *dev, uint32_t* freq_hz );
+void si57x_get_xtal_frequency( struct wr_si57x_interface_device *dev, uint32_t f0, uint32_t* freq_hz );
 int si57x_calc_frequency( uint32_t f_xtal, uint32_t freq_hz, uint64_t *rfreq_out, int* hsdiv_out, int* n1_out );
 void si57x_reset(struct wr_si57x_interface_device *dev );
 int si57x_set_frequency( struct wr_si57x_interface_device *dev, uint32_t f_xtal, uint32_t freq_hz, int vco_gain );
