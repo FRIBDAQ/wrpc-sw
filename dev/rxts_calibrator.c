@@ -189,6 +189,8 @@ static int rxts_calibration_update(uint32_t *t24p_value)
 
 	spll_set_phase_shift(0, cal_cur_phase);
 
+	phy_dbg("RXTS calibration: set phase to %dps\n", cal_cur_phase);
+
 	return 0;
 }
 

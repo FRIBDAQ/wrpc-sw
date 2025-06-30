@@ -130,6 +130,11 @@ config LPDC_GTHE4
 	help
 	  The transceiver is family7-gthe4-lp
 
+config LPDC_GTHE4_RXPI
+	bool "Xilinx GTHE4 with RXPI"
+	help
+	  The transceiver is on the board
+
 endchoice
 
 config IGNORE_HPLL

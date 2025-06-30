@@ -34,7 +34,10 @@ struct spll_main_state {
 	int tag_out_interp;
 #endif
 
-	int dref_dt, dout_dt, tag_ref_raw_d, tag_out_raw_d2;
+	/* The previous tag.  Used to compute the frequency. */
+	int tag_ref_raw_d, tag_out_raw_d2;
+
+	int dref_dt, dout_dt;
 	int freq_prelock_gain_boost;
 	int discard_early_cnt;
 	int adder_ref, adder_out;

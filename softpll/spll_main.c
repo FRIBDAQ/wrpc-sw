@@ -20,7 +20,7 @@
 #if defined(CONFIG_TARGET_AMD_DEVBOARD)
 #define MPLL_FREQ_PRELOCK_GAIN_BOOST 1
 #else
-#define MPLL_FREQ_PRELOCK_GAIN_BOOST 20
+#define MPLL_FREQ_PRELOCK_GAIN_BOOST 1
 #endif // defined(CONFIG_TARGET_AMD_DEVBOARD)
 
 #undef WITH_SEQUENCING
@@ -63,8 +63,8 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 
 	s->ps_freeze = 0;
 	s->vco_freeze = 0;
-	s->pi.y_min = (5 << BOARD_SPLL_DIV_BITS);
-	s->pi.y_max = (1 << BOARD_SPLL_DAC_BITS) - (5 << BOARD_SPLL_DIV_BITS);
+	s->pi.y_min = (5 << BOARD_SPLL_DIV_BITS); // 2500 * 4;
+	s->pi.y_max = (1 << BOARD_SPLL_DAC_BITS) - (5 << BOARD_SPLL_DIV_BITS); // 3100 * 4;
 	s->pi.anti_windup = 1;
 	s->pi.bias = (1 << (BOARD_SPLL_DAC_BITS - 1)); // midscale
 	s->pi.shift = PI_FRACBITS - BOARD_SPLL_DIV_BITS;
@@ -109,8 +109,8 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 	}
 	init = 0;
 #elif defined(CONFIG_WR_NODE)
-	s->pi.kp = -1100;		// / 2;
-	s->pi.ki = -30;			// / 2;
+	s->pi.kp = -110; // -1100; //-50;		// / 2;
+	s->pi.ki = -3; // -30; // -1;			// / 2;
 #else
 #error "Please set CONFIG for wr switch or wr node"
 #endif
@@ -255,18 +255,16 @@ void mpll_stop(struct spll_main_state *s)
 	s->enabled = 0;
 }
 
-//#ifdef CONFIG_FRAC_SPLL
 static inline void update_dtag_dt( int *dtag_dt, int tag, int *tag_d )
 {
 	if( tag == *tag_d )
 		return;
 
 	*dtag_dt = (tag - *tag_d);
-	if( *dtag_dt < 0 )
-			*dtag_dt += (1<<TAG_BITS);
+//	if( *dtag_dt < 0 )
+//			*dtag_dt += (1<<TAG_BITS);
 	*tag_d = tag;
 }
-//#endif
 
 void mpll_update(struct spll_main_state *s, int tag, int source)
 {
@@ -468,24 +466,21 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 			s->adder_out -= MPLL_TAG_WRAPAROUND;
 		}
 
-		if (s->locked && !s->ps_freeze) {
-			if (s->phase_shift_current < s->phase_shift_target) {
-				s->phase_shift_current++;
+		if (s->locked
+		    && !s->ps_freeze
+		    && s->phase_shift_current != s->phase_shift_target) {
+			const int maxdelta = 80;
+			int delta = s->phase_shift_current - s->phase_shift_target;
+			if (delta > maxdelta)
+				delta = maxdelta;
+			else if (delta < -maxdelta)
+				delta = -maxdelta;
 
-				if (!reverse_spll)
-					s->adder_ref++;
-				else
-					s->adder_ref--;
-
-			} else if (s->phase_shift_current >
-				   s->phase_shift_target) {
-				s->phase_shift_current--;
-
-				if (!reverse_spll)
-					s->adder_ref--;
-				else
-					s->adder_ref++;
-			}
+			s->phase_shift_current -= delta;
+			if (!reverse_spll)
+				s->adder_ref -= delta;
+			else
+				s->adder_ref += delta;
 		}
 
 		if(s->freq_ld.locked)
@@ -513,13 +508,16 @@ static int32_t from_picos(int32_t ps)
 {
 	uint64_t ups = ps;
 
+	/* 1step = 800ps/128/(1<<15)*256
+                 = 800ps/(1<<15)*2
+                 = 800ps/(1<<14) */
 	if (ps >= 0) {
-		ups *= 1 << HPLL_N;
-		__div64_32(&ups, CLOCK_PERIOD_PICOSECONDS);
+		ups *= 1 << 14;
+		__div64_32(&ups, 200);
 		return ups;
 	}
-	ups = -ps * (1 << HPLL_N);
-	__div64_32(&ups, CLOCK_PERIOD_PICOSECONDS);
+	ups = -ps * (1 << 14);
+	__div64_32(&ups, 200);
 	return -ups;
 }
 #else /* previous implementation: ptp-noposix has no __div64_32 available */
