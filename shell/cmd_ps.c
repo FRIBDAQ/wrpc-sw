@@ -47,7 +47,7 @@ static int cmd_ps(const char *args[])
 			return 0;
 		if(!t->used)
 			continue;
-		pp_printf("  %9li   %9li.%06li %9ld %s\n", t->nrun,
+		pp_printf("%11lu   %9lu.%06lu %9lu %s\n", t->nrun,
 					t->seconds, t->nanos/1000, t->max_run_ticks, t->name);
 	}
 	return 0;
