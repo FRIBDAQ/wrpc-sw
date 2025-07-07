@@ -33,16 +33,21 @@ static volatile struct rxpi_gthe4_map *regs =
   (volatile struct rxpi_gthe4_map *)BASE_AUXWB;
 
 enum rx_fsm_state {
-    /* Out of reset, wait for commas */
+    /* Start a reset. */
     RX_RESET,
+    /* Wait end of reset */
+    RX_WAIT_RESET,
+    /* Out of reset, wait for commas */
+    RX_WAIT_COMMA,
     /* Comma detected, wait for alignment */
-    RX_COMMA,
+    RX_WAIT_ALIGN,
     /* Comma detected and at correct alignment */
-    RX_ALIGNED
+    RX_READY
 };
 
 struct rx_state {
     enum rx_fsm_state state;
+    timeout_t timeout;
 };
 
 static struct rx_state rx_state;
@@ -54,22 +59,40 @@ int phy_calibration_poll(void)
     status = regs->status;
     switch (rx_state.state) {
     case RX_RESET:
+	phy_dbg("reset rx\n");
+	regs->reset |= RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
+	regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
+	tmo_init(&rx_state.timeout, 130);
+	rx_state.state = RX_WAIT_RESET;
+	break;
+    case RX_WAIT_RESET:
+	if (tmo_expired(&rx_state.timeout)) {
+	    regs->reset &= ~RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
+	    rx_state.state = RX_WAIT_COMMA;
+	}
+	break;
+    case RX_WAIT_COMMA:
 	if (status & (1 << 11)) {
 	    phy_dbg("comma detected: %08x\n", status);
-	    rx_state.state = RX_COMMA;
+	    rx_state.state = RX_WAIT_ALIGN;
 	}
 	break;
 
-    case RX_COMMA:
+    case RX_WAIT_ALIGN:
 	if (status & (1 << 10)) {
+	    unsigned bitslide = regs->bitslide;
 	    phy_dbg("comma aligned: %08x slide: %08x\n",
-		    status, regs->bitslide);
-	    rx_state.state = RX_ALIGNED;
-	    regs->ctrl = RXPI_GTHE4_MAP_CTRL_RDY;
+		    status, bitslide);
+	    if (bitslide & 1)
+		rx_state.state = RX_RESET;
+	    else {
+		rx_state.state = RX_READY;
+		regs->ctrl = RXPI_GTHE4_MAP_CTRL_RDY;
+	    }
 	}
 	break;
 
-    case RX_ALIGNED:
+    case RX_READY:
 	if (!(status & (1 << 10))) {
 	    phy_dbg("not comma aligned: %08x\n", status);
 	    rx_state.state = RX_RESET;
