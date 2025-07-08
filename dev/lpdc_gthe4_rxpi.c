@@ -42,12 +42,17 @@ enum rx_fsm_state {
     /* Comma detected, wait for alignment */
     RX_WAIT_ALIGN,
     /* Comma detected and at correct alignment */
+    RX_WAIT_FREQ_LOCK,
+    RX_SWEEP_WAIT,
+    RX_SWEEP_MEASURE,
     RX_READY
 };
 
 struct rx_state {
     enum rx_fsm_state state;
     timeout_t timeout;
+    unsigned ps_res;
+    unsigned prev_val;
 };
 
 static struct rx_state rx_state;
@@ -86,18 +91,63 @@ int phy_calibration_poll(void)
 	    if (bitslide & 1)
 		rx_state.state = RX_RESET;
 	    else {
-		rx_state.state = RX_READY;
+		rx_state.state = RX_WAIT_FREQ_LOCK;
 		regs->ctrl = RXPI_GTHE4_MAP_CTRL_RDY;
 	    }
 	}
 	break;
 
-    case RX_READY:
+    case RX_WAIT_FREQ_LOCK:
 	if (!(status & (1 << 10))) {
 	    phy_dbg("not comma aligned: %08x\n", status);
 	    rx_state.state = RX_RESET;
 	    regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
 	}
+	if (softpll.mpll.phase_ld.locked) {
+	    phy_dbg("phase locked!\n");
+	    regs->ps_ctrl = RXPI_GTHE4_MAP_PS_CTRL_RST;
+	    regs->ps_count = 10240;
+	    rx_state.state = RX_SWEEP_WAIT;
+	    rx_state.prev_val = RXPI_GTHE4_MAP_PS_RES_VAL_MASK;
+	}
+	break;
+
+    case RX_SWEEP_WAIT:
+	/* Clear reset, set incdec */
+	regs->ps_ctrl = RXPI_GTHE4_MAP_PS_CTRL_INCDEC;
+	if (regs->ps_stat & RXPI_GTHE4_MAP_PS_STAT_LOCKED) {
+	    rx_state.ps_res = regs->ps_res;
+	    rx_state.state = RX_SWEEP_MEASURE;
+	}
+	break;
+    case RX_SWEEP_MEASURE: {
+	unsigned res = regs->ps_res;
+	if ((res & RXPI_GTHE4_MAP_PS_RES_GEN_MASK)
+	    != (rx_state.ps_res & RXPI_GTHE4_MAP_PS_RES_GEN_MASK)) {
+	    unsigned phase = regs->ps_stat & RXPI_GTHE4_MAP_PS_STAT_PHASE_MASK;
+	    unsigned val = res & RXPI_GTHE4_MAP_PS_RES_VAL_MASK;
+	    phy_dbg("phase measure (%u.%02u): %u (res=%08x)\n",
+		    phase / 56, phase % 56, val, res);
+	    if (val > 0 && rx_state.prev_val == 0) {
+		phy_dbg("rising edge\n");
+		rx_state.state = RX_READY;
+	    }
+	    else if (phase == 20 * 56) {
+		phy_dbg("rx ready\n");
+		rx_state.state = RX_READY;
+	    }
+	    else {
+		regs->ps_ctrl = RXPI_GTHE4_MAP_PS_CTRL_SHIFT
+		    | RXPI_GTHE4_MAP_PS_CTRL_INCDEC;
+		rx_state.prev_val = val;
+		rx_state.state = RX_SWEEP_WAIT;
+	    }
+	}
+	break;
+    }
+    case RX_READY:
+	if (!softpll.mpll.phase_ld.locked)
+	    rx_state.state = RX_WAIT_FREQ_LOCK;
 	break;
     }
     
