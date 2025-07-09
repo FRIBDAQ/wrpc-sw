@@ -33,13 +33,10 @@
 #define SEQ_DISABLED 0
 #define SEQ_CLEAR_DACS 1
 #define SEQ_WAIT_CLEAR_DACS 2
-#define SEQ_START_EXT 3
-#define SEQ_WAIT_EXT 4
-#define SEQ_START_HELPER 5
-#define SEQ_WAIT_HELPER 6
-#define SEQ_START_MAIN 7
-#define SEQ_WAIT_MAIN 8
-#define SEQ_READY 9
+#define SEQ_WAIT_EXT 3
+#define SEQ_WAIT_HELPER 4
+#define SEQ_WAIT_MAIN 5
+#define SEQ_READY 6
 
 #define AUX_DISABLED 1
 #define AUX_LOCK_PLL 2

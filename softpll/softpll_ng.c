@@ -30,11 +30,8 @@ static const char * const seq_states[] =
 	[SEQ_DISABLED] = "disabled",
 	[SEQ_CLEAR_DACS] = "clear-dacs",
 	[SEQ_WAIT_CLEAR_DACS] = "wait-clear-dacs",
-	[SEQ_START_EXT] = "start-ext",
 	[SEQ_WAIT_EXT] = "wait-ext",
-	[SEQ_START_HELPER] = "start-helper",
 	[SEQ_WAIT_HELPER] = "wait-helper",
-	[SEQ_START_MAIN] = "start-main",
 	[SEQ_WAIT_MAIN] = "wait-main",
 	[SEQ_READY] = "ready",
 };
@@ -139,21 +136,21 @@ static inline void sequencing_fsm(struct softpll_state *s, int tag_value, int ta
 		{
 			if (time_after(timer_get_tics(), s->dac_timeout))
 			{
-				if(s->mode == SPLL_MODE_GRAND_MASTER)
-					s->seq_state = SEQ_START_EXT;
-				else
-					s->seq_state = SEQ_START_HELPER;
+				if(s->mode == SPLL_MODE_GRAND_MASTER) {
+					/* Starts up PLL for locking local
+					   reference to 10 MHz input */
+					spll_enable_tagger(MAIN_CHANNEL, 0);
+					external_start(&s->ext);
+
+					s->seq_state = SEQ_WAIT_EXT;
+				}
+				else {
+					/* Once the DAC are on and stable,
+					   start helper PLL */
+					helper_start(&s->helper);
+					s->seq_state = SEQ_WAIT_HELPER;
+				}
 			}
-			break;
-		}
-
-		/* State "Start external reference PLL": starts up BB PLL for locking local reference to 10 MHz input */
-		case SEQ_START_EXT:
-		{
-			spll_enable_tagger(MAIN_CHANNEL, 0);
-			external_start(&s->ext);
-
-			s->seq_state = SEQ_WAIT_EXT;
 			break;
 		}
 
@@ -168,39 +165,23 @@ static inline void sequencing_fsm(struct softpll_state *s, int tag_value, int ta
 			break;
 		}
 
-		/* Once the DAC are on and stable, start helper PLL */
-		case SEQ_START_HELPER:
-		{
-			helper_start(&s->helper);
-
-			s->seq_state = SEQ_WAIT_HELPER;
-			break;
-		}
-
 		case SEQ_WAIT_HELPER:
-		{
-			if (s->helper.ld.locked && s->helper.ld.lock_changed)
-			{
-				if (s->mode == SPLL_MODE_SLAVE)
-				{
-					s->seq_state = SEQ_START_MAIN;
-				} else {
-					/* Free running master, no need to
-					   lock the main clock */
-					start_ptrackers(s);
-					s->seq_state = SEQ_READY;
-					set_channel_status(s->mpll.id_ref, 1);
-				}
+			/* Wait until helper pll is locked */
+			if (!(s->helper.ld.locked && s->helper.ld.lock_changed))
+				break;
+
+			if (s->mode == SPLL_MODE_SLAVE) {
+				/* Start main pll */
+				mpll_start(&s->mpll);
+				s->seq_state = SEQ_WAIT_MAIN;
+			} else {
+				/* Free running master, no need to
+				   lock the main clock */
+				start_ptrackers(s);
+				s->seq_state = SEQ_READY;
+				set_channel_status(s->mpll.id_ref, 1);
 			}
 			break;
-		}
-
-		case SEQ_START_MAIN:
-		{
-			mpll_start(&s->mpll);
-			s->seq_state = SEQ_WAIT_MAIN;
-			break;
-		}
 
 		case SEQ_WAIT_MAIN:
 		{
