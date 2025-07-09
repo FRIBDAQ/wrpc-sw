@@ -27,16 +27,16 @@ int periph_id_global = 0;
 
 static const char * const seq_states[] =
 {
+	[SEQ_DISABLED] = "disabled",
+	[SEQ_CLEAR_DACS] = "clear-dacs",
+	[SEQ_WAIT_CLEAR_DACS] = "wait-clear-dacs",
 	[SEQ_START_EXT] = "start-ext",
 	[SEQ_WAIT_EXT] = "wait-ext",
 	[SEQ_START_HELPER] = "start-helper",
 	[SEQ_WAIT_HELPER] = "wait-helper",
 	[SEQ_START_MAIN] = "start-main",
 	[SEQ_WAIT_MAIN] = "wait-main",
-	[SEQ_DISABLED] = "disabled",
 	[SEQ_READY] = "ready",
-	[SEQ_CLEAR_DACS] = "clear-dacs",
-	[SEQ_WAIT_CLEAR_DACS] = "wait-clear-dacs",
 };
 #define SEQ_STATES_NR  ARRAY_SIZE(seq_states)
 
