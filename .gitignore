@@ -26,3 +26,4 @@ size_info.txt
 *.bk
 disasm.S
 .gdbinit
+/cache/

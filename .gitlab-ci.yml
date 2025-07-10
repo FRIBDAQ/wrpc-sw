@@ -8,7 +8,21 @@ variables:
   GIT_SUBMODULE_STRATEGY: normal
 
 before_script:
-  - PATH=/compilers/riscv-11.2-small/bin:/compilers/lm32-gcc-4.5.3/bin:$PATH
+  - apt update && apt upgrade -y
+  - DEBIAN_FRONTEND=noninteractive TZ=Europe/Zurich apt -y install tzdata
+  - apt install -y wget git make build-essential libreadline-dev locales
+  - locale-gen en_US.UTF-8
+  - mkdir -p cache/downloads && cd cache/downloads
+  - wget -c https://gitlab.com/ohwr/project/wrpc-sw/-/wikis/uploads/9f9224d2249848ed3e854636de9c08dc/riscv-11.2-small.tgz
+  - wget -c https://gitlab.com/ohwr/project/wr-cores/-/wikis/uploads/2776ce0ba43503d1486ae205b48fb450/lm32_host_64bit.tar.xz
+  - cd ..
+  - tar -xf downloads/riscv-11.2-small.tgz
+  - tar -xf downloads/lm32_host_64bit.tar.xz
+  - export CROSS_COMPILE_LM32=`pwd`/lm32-gcc-4.5.3/bin/lm32-elf-
+  - export CROSS_COMPILE_RISCV=`pwd`/riscv-11.2-small/bin/riscv32-elf-
+  - echo ${CROSS_COMPILE_LM32} ${CROSS_COMPILE_RISCV}
+  - cd ${CI_PROJECT_DIR}
+  #- PATH=/compilers/riscv-11.2-small/bin:/compilers/lm32-gcc-4.5.3/bin:$PATH
   # use the user who triggered a job to appear in binaries
   - echo "[user]" >  ~/.gitconfig
   - echo "    name = CI ${GITLAB_USER_NAME}" >>  ~/.gitconfig
@@ -33,6 +47,8 @@ make_all:
   tags:
     - ${WRPC_SW_RUNNER_TAG}
   script:
+    # needed for ertm14 build
+    - apt install -y libudev-dev
     - NPROC=$(grep -c ^processor /proc/cpuinfo)
     - fail=""
     - for f in $(ls configs); do
