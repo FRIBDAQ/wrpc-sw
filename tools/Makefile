@@ -8,7 +8,9 @@ CFLAGS += -DBUILD_HOST
 CFLAGS += --std=gnu99
 CFLAGS += -I../softpll
 
-LDFLAGS = $(TOOLS_LDFLAGS) -lutil -L../liblinux -ldevmap -L../liblinux/extest -lextest
+LDFLAGS = $(TOOLS_LDFLAGS)
+DEVMAP_LDFLAGS = -L../liblinux -ldevmap
+EXTEST_LDFLAGS = -L../liblinux/extest -lextest
 ALL    = genraminit genramvhd genrammif genrammem
 #ALL   += wrpc-w1-read wrpc-w1-write
 ALL   += pfilter-builder
@@ -99,19 +101,19 @@ dump_mem_ppsi_wrpc.o: ../ppsi/tools/dump_mem_ppsi_wrpc.c
 dump_mem_ppsi_wrpc.o: CFLAGS+=-include $(AUTOCONF) -I../ppsi/include -I../ppsi/arch-wrpc -I../ppsi/arch-wrpc/include -I.
 
 wr-streamers: wr-streamers.c
-	$(CC) $(CFLAGS)  $^ $(LDFLAGS) -o $@ -lreadline
+	$(CC) $(CFLAGS)  $^ $(LDFLAGS) $(DEVMAP_LDFLAGS) $(EXTEST_LDFLAGS) -o $@ -lreadline
 
 wrpc-diags: wrpc-diags.c
-	$(CC) $(CFLAGS)  $^ $(LDFLAGS) -o $@ -lreadline
+	$(CC) $(CFLAGS)  $^ $(LDFLAGS) $(DEVMAP_LDFLAGS) $(EXTEST_LDFLAGS) -o $@ -lreadline
 
 wrpc-vuart: wrpc-vuart.o vuart_lib.o
-	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $^ $(LDFLAGS) $(DEVMAP_LDFLAGS) -o $@
 
 wrpc-load: wrpc-load.o
-	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
+	$(CC) $(CFLAGS) $^ $(LDFLAGS) $(DEVMAP_LDFLAGS) -o $@
 
 wrpc: wrpc.o
-	$(CC) $(CFLAGS) $(WRPC_ERTM_FLAGS) $^ $(TOOL_LDFLAGS) $(LIBVME_LDFLAGS) -o $@ $(WRPC_ERTM_LIBS) -lm
+	$(CC) $(CFLAGS) $(WRPC_ERTM_FLAGS) $^ $(DEVMAP_LDFLAGS) $(LIBVME_LDFLAGS) -o $@ $(WRPC_ERTM_LIBS) -lm
 
 wrpc.o: wrpc.c
 	$(CC_TARGET_HOST) -c $(CFLAGS) $< $(LIBVME_CFLAGS) -include ../include/generated/autoconf.h -o $@
