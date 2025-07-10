@@ -271,7 +271,7 @@ extest:
 	$(MAKE) -C liblinux/extest CC=cc
 
 tools-dependencies-$(CONFIG_TARGET_ERTM14) +=  libertm
-tools/gensdbfs tools/pfilter-builder tools/genraminit tools/genramvhd tools/genrammif tools/genrammem: tools
+tools/genraminit tools/genramvhd tools/genrammif tools/genrammem: tools
 	@true
 
 tools: .config $(AUTOCONF) gitmodules liblinux extest $(tools-dependencies-y)
@@ -279,6 +279,9 @@ tools: .config $(AUTOCONF) gitmodules liblinux extest $(tools-dependencies-y)
 
 tools-diag: liblinux extest
 	$(MAKE) -C tools wrpc-diags wrpc-vuart wr-streamers
+
+tools/pfilter-builder tools/gensdbfs:
+	$(MAKE) -C tools $(@F)
 
 # if needed, check out the submodules (first time only), so users
 # who didn't read carefully the manual won't get confused
