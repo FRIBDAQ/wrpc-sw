@@ -8,7 +8,6 @@
  */
 
 #include <dev/syscon.h>
-#include <stdlib.h>
 #include <string.h>
 #include <wrc.h>
 #include "shell.h"

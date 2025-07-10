@@ -8,7 +8,6 @@
  */
 
 #include <dev/syscon.h>
-#include <stdlib.h>
 #include <wrc.h>
 #include "dev/timecode.h"
 #include "wrpc.h"
