@@ -12,7 +12,7 @@
 #include <wrc.h>
 #include "dev/nmea_out.h"
 
-#define SUART_CALC_BAUD(baudrate, clkrate) \
+#define SUART_CALC_BAUD_NMEA(baudrate, clkrate) \
     ( ((( (unsigned long long)baudrate * 8ULL) << (16 - 7)) + \
       (clkrate >> 8)) / (clkrate >> 7) )
 
@@ -26,7 +26,7 @@ int nmea_out_set_baud(struct nmea_master *dev, uint32_t baudrate)
   int baud = 0;
   int clk_freq = (dev->SR & NMEA_MASTER_SR_CLK_FREQ_MASK) >> NMEA_MASTER_SR_CLK_FREQ_SHIFT;
   int cr = dev->CR;
-  baud = SUART_CALC_BAUD(baudrate, clk_freq);
+  baud = SUART_CALC_BAUD_NMEA(baudrate, clk_freq);
   cr &= ~NMEA_MASTER_CR_BAUD_DIV_MASK;
   cr |= (baud << NMEA_MASTER_CR_BAUD_DIV_SHIFT);
   dev->CR = cr;

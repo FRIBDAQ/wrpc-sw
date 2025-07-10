@@ -18,7 +18,7 @@
 
 #define NMEA_MASTER ((volatile struct nmea_master*) (BASE_TIMECODE+TIMECODE_NMEA))
 
-#define SUART_CALC_BAUD(baudrate, clkrate) \
+#define SUART_CALC_BAUD_NMEA(baudrate, clkrate) \
     ( ((( (unsigned long long)baudrate * 8ULL) << (16 - 7)) + \
       (clkrate >> 8)) / (clkrate >> 7) )
 
@@ -56,7 +56,7 @@ static int set_baud(uint32_t baudrate)
   }
   
   if(valid){
-    baud = SUART_CALC_BAUD(baudrate, clk_freq);
+    baud = SUART_CALC_BAUD_NMEA(baudrate, clk_freq);
     cr &= ~NMEA_MASTER_CR_BAUD_DIV_MASK;
     cr |= (baud << NMEA_MASTER_CR_BAUD_DIV_SHIFT);
     NMEA_MASTER->CR = cr;
