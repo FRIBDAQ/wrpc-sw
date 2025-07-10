@@ -41,6 +41,10 @@ make_wrpc_sw:
     name: wrpc_sw_ci_${CI_JOB_NAME}_${CI_JOB_ID}
     paths:
     - wrc.elf
+  cache:
+    key: wrpc-sw-download-cache
+    paths:
+      - cache/downloads
 
 make_all:
   stage: compile
@@ -61,6 +65,10 @@ make_all:
     - done
     - echo "FAILED TARGET are $fail"
     - test "$fail" = ""
+  cache:
+    key: wrpc-sw-download-cache
+    paths:
+      - cache/downloads
 
 make_rt_cpu:
   stage: compile
@@ -73,3 +81,7 @@ make_rt_cpu:
     name: wrpc_sw_ci_${CI_JOB_NAME}_${CI_JOB_ID}
     paths:
     - rt_cpu.elf
+  cache:
+    key: wrpc-sw-download-cache
+    paths:
+      - cache/downloads
