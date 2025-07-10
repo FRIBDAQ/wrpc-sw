@@ -1,3 +1,6 @@
+# NOTE: to be able to run CI define the following env variables:
+# --WRPC_SW_RUNNER_TAG - optional tag of allowed runners
+
 variables:
   GIT_SUBMODULE_STRATEGY: normal
 
@@ -13,7 +16,7 @@ stages:
 make_wrpc_sw:
   stage: compile
   tags:
-  - ohwrsw
+    - ${WRPC_SW_RUNNER_TAG}
   script:
   - make spec_defconfig
   - make
@@ -25,7 +28,7 @@ make_wrpc_sw:
 make_all:
   stage: compile
   tags:
-  - ohwrsw
+    - ${WRPC_SW_RUNNER_TAG}
   script:
     - NPROC=$(grep -c ^processor /proc/cpuinfo)
     - fail=""
@@ -43,7 +46,7 @@ make_all:
 make_rt_cpu:
   stage: compile
   tags:
-  - ohwrsw
+    - ${WRPC_SW_RUNNER_TAG}
   script:
   - make wr_switch_defconfig
   - make
