@@ -1,5 +1,8 @@
 # NOTE: to be able to run CI define the following env variables:
+# --WRPC_SW_REGISTRY_PATH - optional the path to the registry
 # --WRPC_SW_RUNNER_TAG - optional tag of allowed runners
+
+image: ${WRPC_SW_REGISTRY_PATH}ubuntu:22.04
 
 variables:
   GIT_SUBMODULE_STRATEGY: normal
