@@ -41,6 +41,12 @@ make_wrpc_sw:
     name: wrpc_sw_ci_${CI_JOB_NAME}_${CI_JOB_ID}
     paths:
     - wrc.elf
+    - tools/wrpc
+    - tools/wrpc-diags
+    - tools/wrpc-dump
+    - tools/wrpc-load
+    - tools/wrpc-vuart
+    - tools/mapper
   cache:
     key: wrpc-sw-download-cache
     paths:
