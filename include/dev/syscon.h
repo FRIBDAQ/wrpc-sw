@@ -19,10 +19,10 @@ void timer_delay(uint32_t tics);
 /* The following ones come from the kernel, but simplified */
 #ifndef time_after
 #define time_after(a,b)		\
-	((long)(b) - (long)(a) < 0)
+	((long)((b) - (a)) < 0)
 #define time_before(a,b)	time_after(b,a)
 #define time_after_eq(a,b)	\
-	 ((long)(a) - (long)(b) >= 0)
+	 ((long)((a) - (b)) >= 0)
 #define time_before_eq(a,b)	time_after_eq(b,a)
 #endif
 
