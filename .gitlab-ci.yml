@@ -60,17 +60,16 @@ make_all:
     # needed for ertm14 build
     - apt install -y libudev-dev
     - NPROC=$(grep -c ^processor /proc/cpuinfo)
-    - fail=""
-    - for f in $(ls configs); do
-    -   make clean
-    -   make $f
-    -   if ! make -j$NPROC; then
-    -     echo "FAILURE of $f"
-    -     fail="$fail $f"
-    -   fi
-    - done
-    - echo "FAILED TARGET are $fail"
-    - test "$fail" = ""
+    # to make compare_size.sh work
+    - touch size_db.txt
+    - echo "Using $NPROC parallel jobs".
+    - GIT_HASH_START="HEAD~1" MAKEFLAGS="-j $NPROC" ./MAKEALL -c
+  artifacts:
+    name: wrpc_sw_ci_${CI_JOB_NAME}_${CI_JOB_ID}
+    paths:
+    - size_info.txt
+    - ./*.elf
+    - ./*.bin
   cache:
     key: wrpc-sw-download-cache
     paths:
