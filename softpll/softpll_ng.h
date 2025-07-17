@@ -194,6 +194,8 @@ struct softpll_state {
 	struct spll_external_state ext;
 	struct spll_main_state mpll;
 	struct spll_aux_state aux[MAX_CHAN_AUX];
+
+	/* ptracker for each ref channel (recovered clock). */
 	struct spll_ptracker_state ptrackers[MAX_PTRACKERS];
 };
 
