@@ -10,10 +10,10 @@
 
 #if CONFIG_VERBOSE_DETAIL
 static const char diag_names[8][8] = {
-  "fsm    ",
-  "time   ",
-  "frames ",
-  "servo  ",
+  "fsm    ",  /* 'verbose 3' */
+  "time   ",  /* 'verbose 03' */
+  "frames ",  /* 'verbose 003' */
+  "servo  ",  /* 'verbose 0003' */
   "bmc    ",
   "ext    ",
   "config ",
