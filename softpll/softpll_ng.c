@@ -441,8 +441,7 @@ int spll_check_lock(int channel)
 
 static int32_t to_picos(int32_t units)
 {
-	return (int32_t) (((int64_t) units *
-			   (int64_t) CLOCK_PERIOD_PICOSECONDS) >> HPLL_N);
+	return ((int64_t) units * 200) >> 14;
 }
 
 /* Channel 0 = local PLL reference, 1...N = aux oscillators */

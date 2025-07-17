@@ -14,10 +14,19 @@
 
 /* NOTE: Please increment WRPC_SHMEM_VERSION if you change this structure */
 struct spll_ptracker_state {
-	int enabled, id;
-	int n_avg, acc, avg_count, preserve_sign;
-	int phase_val, ready;
-	int dbg_channel;
+	unsigned char enabled;
+	/* True if the result is set */
+	unsigned char ready;
+	unsigned char dbg_channel;
+	/* Id, not really used */
+	unsigned char id;
+	/* Number of samples to average */
+	unsigned n_avg;
+	/* Current state. */
+	int acc, avg_count, preserve_sign;
+	/* Result (phase in dmtd unit) */
+	int phase_val;
+	int offset;
 };
 
 void ptracker_init(struct spll_ptracker_state *s, int id, int num_avgs);

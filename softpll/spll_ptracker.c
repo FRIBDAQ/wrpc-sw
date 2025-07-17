@@ -25,6 +25,7 @@ void ptracker_init(struct spll_ptracker_state *s, int id, int num_avgs)
 	s->avg_count = 0;
 	s->enabled = 0;
 	s->dbg_channel = -1;
+	s->offset = 0;
 }
 
 void ptracker_start(struct spll_ptracker_state *s)
@@ -38,6 +39,9 @@ void ptracker_start(struct spll_ptracker_state *s)
 	spll_enable_tagger(s->id, 1);
 	spll_enable_tagger(MAIN_CHANNEL, 1);
 }
+
+#undef HPLL_N
+#define HPLL_N 22
 
 void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 		      int source)
@@ -88,7 +92,7 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 		s->avg_count ++;
 
 		if (s->avg_count == s->n_avg) {
-			s->phase_val = s->acc / s->n_avg;
+			s->phase_val = (s->acc / s->n_avg) + s->offset;
 			s->ready = 1;
 			s->acc = 0;
 			s->avg_count = 0;

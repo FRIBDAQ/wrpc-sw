@@ -150,32 +150,28 @@ static inline void mpll_handle_gain_schedule( struct spll_main_state *s )
 {
 	int do_update = 0;
 
-	if (!s->gain_sched)
-	{
-		s->locked = s->phase_ld.locked;
+	if (!s->gain_sched) {
+		s->locked = s->phase_ld.locked && s->rxpi_ready;
 		return;
 	}
 
-	if( s->gain_sched->locked_d && !s->phase_ld.locked ) // Pll out-of-lock? restart
-	{
+	if (s->gain_sched->locked_d && !s->phase_ld.locked) {
+		// Pll out-of-lock? restart
 		s->gain_sched->current_stage = 0;
 		s->locked = 0;
 		do_update = 1;
 	}
-	else if ( !s->gain_sched->locked_d && s->phase_ld.locked ) // PLL lock acquired? advance stage
-	{
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_EVENT, SPLL_DBG_EVT_GAIN_SWITCH, 0);
-		if ( s->gain_sched->current_stage == s->gain_sched->n_stages - 1 )
+	else if (s->phase_ld.locked) {
+		 // PLL lock acquired? advance stage
+		if (s->gain_sched->current_stage == s->gain_sched->n_stages - 1)
 		{
-			s->locked = 1;
+			s->locked = s->rxpi_ready;
 			s->gain_sched->locked_d = 1;
 			return;
 		}
-		else
-		{
-			s->gain_sched->current_stage++;
-		}
 
+		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_EVENT, SPLL_DBG_EVT_GAIN_SWITCH, 0);
+		s->gain_sched->current_stage++;
 		do_update = 1;
 	}
 
@@ -508,9 +504,9 @@ static int32_t from_picos(int32_t ps)
 {
 	uint64_t ups = ps;
 
-	/* 1step = 800ps/128/(1<<15)*256
-                 = 800ps/(1<<15)*2
-                 = 800ps/(1<<14) */
+	/* 1step = 200ps/128/(1<<15)*256
+                 = 200ps/(1<<15)*2
+                 = 200ps/(1<<14) */
 	if (ps >= 0) {
 		ups *= 1 << 14;
 		__div64_32(&ups, 200);

@@ -43,7 +43,8 @@ struct spll_main_state {
 	int adder_ref, adder_out;
 	int tag_ref, tag_ref_d;
 	int tag_out, tag_out_d;
-	int locked; // locked flag
+	unsigned char locked; // locked flag
+	unsigned char rxpi_ready;
 	int phase_shift_target;
 	int phase_shift_current;
 	int id_ref, id_out;	/* IDs of the reference and the output channel */
