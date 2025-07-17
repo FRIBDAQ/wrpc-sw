@@ -214,16 +214,23 @@ int minic_rx_frame(struct wr_minic *nic, struct wr_ethhdr *hdr,
 		/* build correct timestamp to return in hwts structure */
 		shw_pps_gen_get_time(&sec, &counter_ppsg);
 
+		/* Extract counter values from OOB words */
 		EXPLODE_WR_TIMESTAMP(raw_ts, counter_r, counter_f);
 
+		/* If the PPS cycle counter is in the next second, then
+		   the timestamp was in the previous second */
 		if (counter_r > 3 * REF_CLOCK_FREQ_HZ / 4
 		    && counter_ppsg < 250000000)
 			sec--;
 
 		hwts->sec = sec;
 
+		/* Difference between rising and falling edge counters */
 		cntr_diff = (counter_r & F_COUNTER_MASK) - counter_f;
 
+		/* Set if the rising edge counter is in advance compared to
+		   the falling edge counter.
+		   FIXME: why -F_COUNTER_MASK ? */
 		if (cntr_diff == 1 || cntr_diff == (-F_COUNTER_MASK))
 			hwts->ahead = 1;
 		else
