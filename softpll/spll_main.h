@@ -62,7 +62,7 @@ void mpll_stop(struct spll_main_state *s);
 
 void mpll_start(struct spll_main_state *s);
 
-int mpll_update(struct spll_main_state *s, int tag, int source);
+void mpll_update(struct spll_main_state *s, int tag, int source);
 
 int mpll_set_phase_shift(struct spll_main_state *s,
 				int desired_shift_ps);
