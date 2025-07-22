@@ -251,17 +251,6 @@ void mpll_stop(struct spll_main_state *s)
 	s->enabled = 0;
 }
 
-static inline void update_dtag_dt( int *dtag_dt, int tag, int *tag_d )
-{
-	if( tag == *tag_d )
-		return;
-
-	*dtag_dt = (tag - *tag_d);
-//	if( *dtag_dt < 0 )
-//			*dtag_dt += (1<<TAG_BITS);
-	*tag_d = tag;
-}
-
 void mpll_update(struct spll_main_state *s, int tag, int source)
 {
 	if(!s->enabled)
@@ -269,22 +258,11 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 
 	int err, y;
 
-	if (source == s->id_ref)
-	{
-		/* Capture ref tag */
-		s->tag_ref = tag;
+	if (source != s->id_ref)
+		return;
 
-#ifdef CONFIG_FRAC_SPLL
-		s->n_ref++;
-
-		if(s->tag_out_interp >= 0)
-		{
-			s->tag_out = s->tag_out_interp;
-			s->n_out++;
-			s->tag_out_interp = -1;
-		}
-#endif
-	}
+	/* Capture ref tag (RX clock) */
+	s->tag_ref = tag;
 
 	/* out is the WR clock */
 	s->tag_out = 0;
@@ -329,7 +307,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 
 	int freq_error = s->dout_dt - s->dref_dt;
 
-	ld_update((spll_lock_det_t *)&s->freq_ld, freq_error);
+	ld_update(&s->freq_ld, freq_error);
 
 	if ( s->freq_ld.lock_changed && s->freq_ld.locked )
 	{
