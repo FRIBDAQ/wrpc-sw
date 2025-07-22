@@ -286,218 +286,145 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 #endif
 	}
 
-	if (source == s->id_out)
-	{
-		/* Capture out tag */
-#ifdef CONFIG_FRAC_SPLL
-		s->tag_out_raw_d = s->tag_out_raw;
-		s->tag_out_raw = tag;
-		if (s->div_ref == 0)
-		{
-			s->tag_out = tag;
-			s->n_out++;
-		}
-		else
-		{
-			int t_raw = s->tag_out_raw;
-			if (t_raw < s->tag_out_raw_d)
-				t_raw += (1 << TAG_BITS);
-
-			int w0 = s->div_cnt * s->div_fb;
-			int w1 = (s->div_cnt + 1) * s->div_fb;
-
-			//printf("w0 %d/%d w1 %d/%d\n", w0, div_ref, w1, div_ref );
-
-			int f0 = w0 % s->div_ref;
-			int f1 = w1 % s->div_ref;
-
-			int c0 = w0 / s->div_ref;
-			int c1 = w1 / s->div_ref;
-
-			int tr = ((s->div_ref - f0) * s->tag_out_raw_d + f0 * t_raw) / s->div_ref;
-
-			//printf("Interp[NORM]: %d tprev %d tcur %d c0 %d c1 %d f0 %d f1 %d\n", tr, tag_si_prev, tag_si, c0, c1, f0, f1 );
-			//spll_debug(mtag | DBG_TAG, tr, 1);
-
-			s->tag_out = tr;
-			s->n_out++;
-
-			if (c0 == c1)
-			{
-				s->div_cnt++;
-
-				int tr2 = ((s->div_ref - f1) * s->tag_out_raw_d + f1 * t_raw) / s->div_ref;
-
-				s->tag_out_interp = tr2;
-				//printf("Interp[SLIP]: %d tprev %d tcur %d c0 %d c1 %d f0 %d f1 %d\n", tr, tag_si_prev, tag_si, c0, c1, f0, f1 );
-			}
-			else
-			{
-				s->tag_out_interp = -1;
-			}
-
-			s->div_cnt++;
-
-			if (s->div_cnt == s->div_ref)
-				s->div_cnt = 0;
-		}
-#else
-		s->tag_out = tag;
-#endif
-	}
-
+	/* out is the WR clock */
 	s->tag_out = 0;
+	s->dout_dt = 0;
 
-	if (s->tag_ref >= 0) {
-		/* If there is a new ref tag, compute the delta */
-		update_dtag_dt( &s->dref_dt, s->tag_ref, &s->tag_ref_raw_d );
+	/* If there is a new ref tag, compute the delta */
+	update_dtag_dt( &s->dref_dt, s->tag_ref, &s->tag_ref_raw_d );
 
-		if(s->tag_ref_d >= 0 && s->tag_ref_d > s->tag_ref)
-			s->adder_ref += (1 << TAG_BITS);
+	if(s->tag_ref_d >= 0 && s->tag_ref_d > s->tag_ref)
+	  s->adder_ref += (1 << TAG_BITS);
 
-		s->tag_ref_d = s->tag_ref;
-	}
+	s->tag_ref_d = s->tag_ref;
 
 
-	if (s->tag_out >= 0) {
-		/* If there is a new out tag, compute the delta */
-		update_dtag_dt( &s->dout_dt, s->tag_out, &s->tag_out_raw_d2 );
-
-		if(s->tag_out_d >= 0 && s->tag_out_d > s->tag_out)
-			s->adder_out += (1 << TAG_BITS);
-
-		s->tag_out_d = s->tag_out;
-	}
-
-	if (s->tag_ref >= 0 && s->tag_out >= 0) {
-		/* If there are both ref and out tags, ... */
+	/* If there are both ref and out tags, ... */
 #ifndef CONFIG_FRAC_SPLL
-		if (s->discard_early_cnt == 1) {
-			int adj_ref = s->tag_ref + s->adder_ref;
-			int adj_out = s->tag_out + s->adder_out;
-			if( adj_ref > adj_out )
-			{
-				int delta = adj_ref - adj_out;
-				s->adder_ref -= (delta >> HPLL_N) << HPLL_N;
-			}
-			else
-			{
-				int delta = adj_out - adj_ref;
-				s->adder_out -= (delta >> HPLL_N) << HPLL_N;
-			}
-			if (s->adder_ref < 0 || s->adder_out < 0)
-			{
-				s->adder_ref += MPLL_TAG_WRAPAROUND;
-				s->adder_out += MPLL_TAG_WRAPAROUND;
-			}
-		}
-
-		if( s->discard_early_cnt > 0 )
-			s->discard_early_cnt--;
-
-#endif
-
-		int freq_error = s->dout_dt - s->dref_dt;
-
-		ld_update((spll_lock_det_t *)&s->freq_ld, freq_error);
-
-		if ( s->freq_ld.lock_changed && s->freq_ld.locked )
+	if (s->discard_early_cnt == 1) {
+		int adj_ref = s->tag_ref + s->adder_ref;
+		int adj_out = s->tag_out + s->adder_out;
+		if( adj_ref > adj_out )
 		{
-			s->last_freq_lock_duration_ms = timer_get_tics() - s->lock_start_ms;
-		}
-
-		if( !s->freq_ld.locked )
-		{
-			err = -s->freq_prelock_gain_boost * freq_error;
+			int delta = adj_ref - adj_out;
+			s->adder_ref -= (delta >> HPLL_N) << HPLL_N;
 		}
 		else
 		{
-			err = s->adder_ref + s->tag_ref - s->adder_out - s->tag_out;
+			int delta = adj_out - adj_ref;
+			s->adder_out -= (delta >> HPLL_N) << HPLL_N;
 		}
+		if (s->adder_ref < 0 || s->adder_out < 0)
+		{
+			s->adder_ref += MPLL_TAG_WRAPAROUND;
+			s->adder_out += MPLL_TAG_WRAPAROUND;
+		}
+	}
+
+	if( s->discard_early_cnt > 0 )
+		s->discard_early_cnt--;
+
+#endif
+
+	int freq_error = s->dout_dt - s->dref_dt;
+
+	ld_update((spll_lock_det_t *)&s->freq_ld, freq_error);
+
+	if ( s->freq_ld.lock_changed && s->freq_ld.locked )
+	{
+		s->last_freq_lock_duration_ms = timer_get_tics() - s->lock_start_ms;
+	}
+
+	if( !s->freq_ld.locked )
+	{
+		err = -s->freq_prelock_gain_boost * freq_error;
+	}
+	else
+	{
+		err = s->adder_ref + s->tag_ref - s->adder_out - s->tag_out;
+	}
 
 #ifndef WITH_SEQUENCING
 
-		/* Hack: the PLL is locked, so the tags are close to
-		   each other. But when we start phase shifting, after
-		   reaching full clock period, one of the reference
-		   tags will flip before the other, causing a suddent
-		   2**HPLL_N jump in the error.  So, once the PLL is
-		   locked, we just mask out everything above
-		   2**HPLL_N.
+	/* Hack: the PLL is locked, so the tags are close to
+	   each other. But when we start phase shifting, after
+	   reaching full clock period, one of the reference
+	   tags will flip before the other, causing a suddent
+	   2**HPLL_N jump in the error.  So, once the PLL is
+	   locked, we just mask out everything above
+	   2**HPLL_N.
 
-		   Proper solution: tag sequence numbers */
-		if (s->freq_ld.locked)
-		{
-			err &= (1 << HPLL_N) - 1;
-			if (err & (1 << (HPLL_N - 1)))
-				err |= ~((1 << HPLL_N) - 1);
-		}
+	   Proper solution: tag sequence numbers */
+	if (s->freq_ld.locked)
+	{
+		err &= (1 << HPLL_N) - 1;
+		if (err & (1 << (HPLL_N - 1)))
+			err |= ~((1 << HPLL_N) - 1);
+	}
 
 #endif
 
-		y = pi_update((spll_pi_t *)&s->pi, err);
-		if(!s->vco_freeze)
+	y = pi_update((spll_pi_t *)&s->pi, err);
+	if(!s->vco_freeze)
+	{
+		SPLL->DAC_MAIN = SPLL_DAC_MAIN_VALUE_W(y)
+			| SPLL_DAC_MAIN_DAC_SEL_W(s->dac_index);
+	}
+	if (s->dac_index == 0)
+		spll_log_dac(y);
+
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_CURRENT, s->phase_shift_current, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_TARGET, s->phase_shift_target, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TIME_MS, timer_get_tics(), 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_REF, s->dref_dt, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->dout_dt, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_ERR, err, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_SAMPLE_ID, s->sample_n++, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_Y, y, 1);
+
+	/* Wait for both out and ref tags */
+	s->tag_out = -1;
+	s->tag_ref = -1;
+
+	if (s->adder_ref > 2 * MPLL_TAG_WRAPAROUND
+	    && s->adder_out > 2 * MPLL_TAG_WRAPAROUND) {
+		s->adder_ref -= MPLL_TAG_WRAPAROUND;
+		s->adder_out -= MPLL_TAG_WRAPAROUND;
+	}
+
+	if (s->locked
+	    && !s->ps_freeze
+	    && s->phase_shift_current != s->phase_shift_target) {
+		const int maxdelta = 160;
+		int delta = s->phase_shift_current - s->phase_shift_target;
+		if (delta > maxdelta)
+			delta = maxdelta;
+		else if (delta < -maxdelta)
+			delta = -maxdelta;
+
+		s->phase_shift_current -= delta;
+		if (!reverse_spll)
+			s->adder_ref -= delta;
+		else
+			s->adder_ref += delta;
+	}
+
+	if(s->freq_ld.locked)
+	{
+
+		ld_update((spll_lock_det_t *)&s->phase_ld, err);
+		if( s->phase_ld.lock_changed) 
 		{
-			SPLL->DAC_MAIN = SPLL_DAC_MAIN_VALUE_W(y)
-				| SPLL_DAC_MAIN_DAC_SEL_W(s->dac_index);
-		}
+			spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_EVENT, 
+			s->phase_ld.locked ? SPLL_DBG_EVT_LOCK_ACQUIRED : SPLL_DBG_EVT_LOCK_LOSS, 1);
 
-		if (s->dac_index == 0)
-			spll_log_dac(y);
-
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_CURRENT, s->phase_shift_current, 0);
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_TARGET, s->phase_shift_target, 0);
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TIME_MS, timer_get_tics(), 0);
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_REF, s->dref_dt, 0);
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->dout_dt, 0);
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_ERR, err, 0);
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_SAMPLE_ID, s->sample_n++, 0);
-		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_Y, y, 1);
-
-		/* Wait for both out and ref tags */
-		s->tag_out = -1;
-		s->tag_ref = -1;
-
-		if (s->adder_ref > 2 * MPLL_TAG_WRAPAROUND
-		    && s->adder_out > 2 * MPLL_TAG_WRAPAROUND) {
-			s->adder_ref -= MPLL_TAG_WRAPAROUND;
-			s->adder_out -= MPLL_TAG_WRAPAROUND;
-		}
-
-		if (s->locked
-		    && !s->ps_freeze
-		    && s->phase_shift_current != s->phase_shift_target) {
-			const int maxdelta = 160;
-			int delta = s->phase_shift_current - s->phase_shift_target;
-			if (delta > maxdelta)
-				delta = maxdelta;
-			else if (delta < -maxdelta)
-				delta = -maxdelta;
-
-			s->phase_shift_current -= delta;
-			if (!reverse_spll)
-				s->adder_ref -= delta;
-			else
-				s->adder_ref += delta;
-		}
-
-		if(s->freq_ld.locked)
-		{
-
-			ld_update((spll_lock_det_t *)&s->phase_ld, err);
-			if( s->phase_ld.lock_changed) 
+			if( s->phase_ld.locked )
 			{
-				spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_EVENT, 
-				s->phase_ld.locked ? SPLL_DBG_EVT_LOCK_ACQUIRED : SPLL_DBG_EVT_LOCK_LOSS, 1);
-
-				if( s->phase_ld.locked )
-				{
-					s->last_phase_lock_duration_ms = timer_get_tics() - s->lock_start_ms;
-				}
+				s->last_phase_lock_duration_ms = timer_get_tics() - s->lock_start_ms;
 			}
-
-			mpll_handle_gain_schedule(s);
 		}
+
+		mpll_handle_gain_schedule(s);
 	}
 }
 
