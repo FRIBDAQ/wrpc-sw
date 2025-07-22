@@ -291,7 +291,8 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	s->dout_dt = 0;
 
 	/* If there is a new ref tag, compute the delta */
-	update_dtag_dt( &s->dref_dt, s->tag_ref, &s->tag_ref_raw_d );
+	s->dref_dt = s->tag_ref - s->tag_ref_raw_d;
+	s->tag_ref_raw_d = tag;
 
 	if(s->tag_ref_d >= 0 && s->tag_ref_d > s->tag_ref)
 	  s->adder_ref += (1 << TAG_BITS);
@@ -300,7 +301,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 
 
 	/* If there are both ref and out tags, ... */
-#ifndef CONFIG_FRAC_SPLL
+#if 0 /* ndef CONFIG_FRAC_SPLL */
 	if (s->discard_early_cnt == 1) {
 		int adj_ref = s->tag_ref + s->adder_ref;
 		int adj_out = s->tag_out + s->adder_out;
@@ -364,7 +365,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 
 #endif
 
-	y = pi_update((spll_pi_t *)&s->pi, err);
+	y = pi_update(&s->pi, err);
 	if(!s->vco_freeze)
 	{
 		SPLL->DAC_MAIN = SPLL_DAC_MAIN_VALUE_W(y)
