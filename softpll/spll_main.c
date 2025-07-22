@@ -264,19 +264,14 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	/* Capture ref tag (RX clock) */
 	s->tag_ref = tag;
 
-	/* out is the WR clock */
-	s->tag_out = 0;
-	s->dout_dt = 0;
-
 	/* If there is a new ref tag, compute the delta */
-	s->dref_dt = s->tag_ref - s->tag_ref_raw_d;
+	s->dref_dt = tag - s->tag_ref_raw_d;
 	s->tag_ref_raw_d = tag;
 
 	if(s->tag_ref_d >= 0 && s->tag_ref_d > s->tag_ref)
 	  s->adder_ref += (1 << TAG_BITS);
 
 	s->tag_ref_d = s->tag_ref;
-
 
 	/* If there are both ref and out tags, ... */
 #if 0 /* ndef CONFIG_FRAC_SPLL */
@@ -305,7 +300,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 
 #endif
 
-	int freq_error = s->dout_dt - s->dref_dt;
+	int freq_error = -s->dref_dt;
 
 	ld_update(&s->freq_ld, freq_error);
 
@@ -315,13 +310,9 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	}
 
 	if( !s->freq_ld.locked )
-	{
 		err = -s->freq_prelock_gain_boost * freq_error;
-	}
 	else
-	{
-		err = s->adder_ref + s->tag_ref - s->adder_out - s->tag_out;
-	}
+		err = s->adder_ref + s->tag_ref;
 
 #ifndef WITH_SEQUENCING
 
@@ -360,10 +351,6 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_ERR, err, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_SAMPLE_ID, s->sample_n++, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_Y, y, 1);
-
-	/* Wait for both out and ref tags */
-	s->tag_out = -1;
-	s->tag_ref = -1;
 
 	if (s->adder_ref > 2 * MPLL_TAG_WRAPAROUND
 	    && s->adder_out > 2 * MPLL_TAG_WRAPAROUND) {
