@@ -47,6 +47,7 @@ integral/proportional gains on the response of the system.
 #define SPLL_DBG_EVT_LOCK_ACQUIRED 2		/* PLL has just become locked */
 #define SPLL_DBG_EVT_GAIN_SWITCH 3	/* PLL switched the PI gain (scheduling) */
 #define SPLL_DBG_EVT_LOCK_LOSS 4		/* PLL has just lost lock */
+#define SPLL_DBG_EVT_FREQ_LOCK 5		/* PLL freq become locked */
 
 #define SPLL_DBG_EXTRACT_SOURCE(x) ( (x >> 28) & 0x7 )
 #define SPLL_DBG_EXTRACT_SIGNAL(x) ( (x >> 24) & 0xf )

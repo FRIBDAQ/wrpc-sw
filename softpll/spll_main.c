@@ -261,16 +261,9 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (source != s->id_ref)
 		return;
 
-	/* Capture ref tag (RX clock) */
+	/* Capture ref tag (RX clock) and compute delta. */
 	s->tag_ref = tag;
-
-	/* If there is a new ref tag, compute the delta */
-	s->dref_dt = tag - s->tag_ref_raw_d;
-	s->tag_ref_raw_d = tag;
-
-	if(s->tag_ref_d >= 0 && s->tag_ref_d > s->tag_ref)
-	  s->adder_ref += (1 << TAG_BITS);
-
+	s->dref_dt = tag - s->tag_ref_d;
 	s->tag_ref_d = s->tag_ref;
 
 	/* If there are both ref and out tags, ... */
@@ -307,6 +300,8 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if ( s->freq_ld.lock_changed && s->freq_ld.locked )
 	{
 		s->last_freq_lock_duration_ms = timer_get_tics() - s->lock_start_ms;
+		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_EVENT, 
+			   SPLL_DBG_EVT_FREQ_LOCK, 1);
 	}
 
 	if( !s->freq_ld.locked )
@@ -347,16 +342,10 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_TARGET, s->phase_shift_target, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TIME_MS, timer_get_tics(), 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_REF, s->dref_dt, 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->dout_dt, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->adder_ref, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_ERR, err, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_SAMPLE_ID, s->sample_n++, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_Y, y, 1);
-
-	if (s->adder_ref > 2 * MPLL_TAG_WRAPAROUND
-	    && s->adder_out > 2 * MPLL_TAG_WRAPAROUND) {
-		s->adder_ref -= MPLL_TAG_WRAPAROUND;
-		s->adder_out -= MPLL_TAG_WRAPAROUND;
-	}
 
 	if (s->locked
 	    && !s->ps_freeze
