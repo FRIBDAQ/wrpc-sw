@@ -78,8 +78,9 @@ int cmd_ep(const char *args[])
 	}
 	case 3: {
 		uint32_t dsr = ep_read(dev, EP_REG_DSR);
-		pp_printf("link ok: %u\n", (dsr & EP_DSR_LSTATUS));
+		pp_printf("ready:   %u\n", (dsr & EP_DSR_GTREADY));
 		pp_printf("rx sync: %u\n", (dsr & EP_DSR_RXSYNC));
+		pp_printf("link ok: %u\n", (dsr & EP_DSR_LSTATUS));
 		return 0;
 	}
 	default:

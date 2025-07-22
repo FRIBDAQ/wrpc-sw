@@ -271,6 +271,28 @@
 /* definitions for field: GT ready in reg: Debug/Status register */
 #define EP_DSR_GTREADY                        WBGEN2_GEN_MASK(3, 1)
 
+/* definitions for register: DMTD Control Register */
+
+/* definitions for field: DMTD Phase measurement enable in reg: DMTD Control Register */
+#define EP_DMCR_EN                            WBGEN2_GEN_MASK(0, 1)
+
+/* definitions for field: DMTD averaging samples in reg: DMTD Control Register */
+#define EP_DMCR_N_AVG_MASK                    WBGEN2_GEN_MASK(16, 12)
+#define EP_DMCR_N_AVG_SHIFT                   16
+#define EP_DMCR_N_AVG_W(value)                WBGEN2_GEN_WRITE(value, 16, 12)
+#define EP_DMCR_N_AVG_R(reg)                  WBGEN2_GEN_READ(reg, 16, 12)
+
+/* definitions for register: DMTD Status register */
+
+/* definitions for field: DMTD Phase shift value in reg: DMTD Status register */
+#define EP_DMSR_PS_VAL_MASK                   WBGEN2_GEN_MASK(0, 24)
+#define EP_DMSR_PS_VAL_SHIFT                  0
+#define EP_DMSR_PS_VAL_W(value)               WBGEN2_GEN_WRITE(value, 0, 24)
+#define EP_DMSR_PS_VAL_R(reg)                 WBGEN2_GEN_READ(reg, 0, 24)
+
+/* definitions for field: DMTD Phase shift value ready in reg: DMTD Status register */
+#define EP_DMSR_PS_RDY                        WBGEN2_GEN_MASK(24, 1)
+
 /* definitions for register: PCK Injection CTRL */
 
 /* definitions for field: Config: Interframe GAP in reg: PCK Injection CTRL */
