@@ -40,7 +40,7 @@
 
 /* how finely we scan the phase shift range to determine where we have the bit
  * flip */
-#define CAL_SCAN_STEP 100
+#define CAL_SCAN_STEP 200
 
 /* deglitcher threshold (to remove 1->0->1 flip bit glitches that might occur
    due to jitter) */

@@ -465,7 +465,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 		if (s->locked
 		    && !s->ps_freeze
 		    && s->phase_shift_current != s->phase_shift_target) {
-			const int maxdelta = 80;
+			const int maxdelta = 160;
 			int delta = s->phase_shift_current - s->phase_shift_target;
 			if (delta > maxdelta)
 				delta = maxdelta;
