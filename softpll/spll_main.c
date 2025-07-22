@@ -346,6 +346,8 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 #endif
 	}
 
+	s->tag_out = 0;
+
 	if (s->tag_ref >= 0) {
 		/* If there is a new ref tag, compute the delta */
 		update_dtag_dt( &s->dref_dt, s->tag_ref, &s->tag_ref_raw_d );

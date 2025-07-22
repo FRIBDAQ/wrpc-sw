@@ -243,16 +243,6 @@ void spll_irq_entry(void)
 		tag_source = SPLL_TRR_R0_CHAN_ID_R(trr);
 		tag_value  = SPLL_TRR_R0_VALUE_R(trr);
 
-		if (tag_source == 0) {
-			/* tag 1 is main clock, so as if it has a 0 offset */
-			sequencing_fsm(s, 0, 1);
-			update_loops(s, 0, 1);
-
-			/* Rescale.  (1<<14) samples of 7 bits are collected,
-			   convert to usual 14b tag */
-			// tag_value >>= 7;
-		}
-
 		if (1) {
 			spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_SRC, tag_source, 0);
 			spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_TAG, tag_value, 1);
