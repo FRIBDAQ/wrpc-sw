@@ -288,13 +288,13 @@ int shell_interactive()
 			case KEY_LEFT:
 				if (cmd_pos > 0) {
 					cmd_pos--;
-					esc('D');
+					esc('D'); /* Move cursor backward */
 				}
 				break;
 			case KEY_RIGHT:
 				if (cmd_pos < cmd_len) {
 					cmd_pos++;
-					esc('C');
+					esc('C'); /* Move cursor forward */
 				}
 				break;
 
@@ -307,14 +307,14 @@ int shell_interactive()
 			case KEY_DELETE:
 				if (cmd_pos != cmd_len) {
 					delete(cmd_pos);
-					esc('P');
+					esc('P'); /* Delete character */
 				}
 				break;
 
 			case KEY_BACKSPACE:
 				if (cmd_pos > 0) {
-					esc('D');
-					esc('P');
+					esc('D'); /* Move cursor backward */
+					esc('P'); /* Delete character */
 					delete(cmd_pos - 1);
 					cmd_pos--;
 				}
@@ -326,7 +326,7 @@ int shell_interactive()
 			default:
 				if (!(current_key & ESCAPE_FLAG)
 				    && insert(current_key)) {
-					esc('@');
+					esc('@'); /* Insert space */
 					pp_printf("%c", current_key);
 				}
 				break;
