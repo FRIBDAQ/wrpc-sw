@@ -69,6 +69,7 @@ int phy_calibration_poll(void)
 	regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
 	tmo_init(&rx_state.timeout, 200);
 	rx_state.state = RX_WAIT_RESET;
+	softpll.mpll.rxpi_ready = 0;
 	break;
     case RX_WAIT_RESET:
 	if (tmo_expired(&rx_state.timeout)) {
@@ -77,7 +78,7 @@ int phy_calibration_poll(void)
 	}
 	break;
     case RX_WAIT_COMMA:
-	if (status & (1 << 11)) {
+	if (status & (1 << 16)) {
 	    phy_dbg("comma detected: %08x\n", status);
 	    rx_state.state = RX_WAIT_ALIGN;
 	}
@@ -86,8 +87,7 @@ int phy_calibration_poll(void)
     case RX_WAIT_ALIGN:
 	if (status & (1 << 10)) {
 	    unsigned bitslide = regs->bitslide;
-	    phy_dbg("comma aligned: %08x slide: %08x\n",
-		    status, bitslide);
+	    phy_dbg("comma aligned: %08x slide: %u\n", status, bitslide);
 	    if (bitslide & 1)
 		rx_state.state = RX_RESET;
 	    else {
@@ -99,7 +99,7 @@ int phy_calibration_poll(void)
 	break;
 
     case RX_WAIT_FREQ_LOCK:
-	if (!(status & (1 << 10))) {
+	if (!(status & (1 << 16))) {
 	    phy_dbg("not comma aligned: %08x\n", status);
 	    rx_state.state = RX_RESET;
 	    regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
@@ -125,6 +125,7 @@ int phy_calibration_poll(void)
 	unsigned res = regs->ps_res;
 	if ((res & RXPI_GTHE4_MAP_PS_RES_GEN_MASK)
 	    != (rx_state.ps_res & RXPI_GTHE4_MAP_PS_RES_GEN_MASK)) {
+	    /* Got a new value (different generation). */
 	    unsigned phase = regs->ps_stat & RXPI_GTHE4_MAP_PS_STAT_PHASE_MASK;
 	    unsigned val = res & RXPI_GTHE4_MAP_PS_RES_VAL_MASK;
 
@@ -132,19 +133,34 @@ int phy_calibration_poll(void)
 		phy_dbg("phase measure (%u.%02u=%ups): %u (res=%08x)\n",
 			phase / 56, phase % 56, phase * 800 / 56, val, res);
 	    if (val > 0 && rx_state.prev_val == 0) {
-		unsigned tag_ref = softpll.mpll.tag_ref_d;
-		int delta = (phase / (56 / 4)) - (tag_ref >> 14);
-		softpll.mpll.rxpi_ready = 1;
-		softpll.ptrackers[0].offset = delta << 14;
-		
-		phy_dbg("phase measure (%u.%02u=%ups): %u (res=%08x)\n",
+		unsigned tag_ref = softpll.mpll.tag_ref;
+
+		/* Phase shift clock vco is running at 1250Mhz, so the
+		   period is 800ps.
+		   A shift is 800ps/56 */
+		phy_dbg("phase measure (%u.%02u=%ups): val=%u (res=%08x)\n",
 			phase / 56, phase % 56, phase * 800 / 56, val, res);
 
-		phy_dbg("rising edge, tag=%u (%uui.%04x), delta ui=%d (ui=200ps)\n",
+		/* Phase shift to tag:
+		   ((phase / 56) * 800 / 200) << 14
+		   = (phase << 14) * 4 / 56
+		   = (phase << 14) / 14 */
+		unsigned abs_phase =
+		  ((phase / (56 / 4)) << 14) | (tag_ref & ((1 << 14) - 1));
+		softpll.mpll.phase_shift_current = abs_phase;
+		softpll.mpll.phase_shift_target = abs_phase;
+
+		int delta = tag_ref - abs_phase;
+
+		/* Tag is (200ps/128) * (1<<15) * 256 = 200ps * (1<<14) */
+		phy_dbg("rising edge, tag=%u (%uui.%04x), abs_phase=%u (%uui.%04x=%ups), delta=%u (%uui.%04x) (ui=200ps)\n",
 			tag_ref, tag_ref >> 14, (tag_ref << 2) & 0xffff,
-			delta);
-		softpll.mpll.phase_shift_current = tag_ref + (delta << 14);
-		softpll.mpll.phase_shift_target = softpll.mpll.phase_shift_current;
+			abs_phase, abs_phase >> 14, (abs_phase << 2) & 0xffff,
+			abs_phase * 25 >> 11,
+			delta, delta >> 14, (delta << 2) & 0xffff);
+
+		softpll.ptrackers[0].offset = -delta;
+		softpll.mpll.rxpi_ready = 1;
 		rx_state.state = RX_READY;
 	    }
 	    else if (phase == 20 * 56) {
@@ -161,7 +177,12 @@ int phy_calibration_poll(void)
 	break;
     }
     case RX_READY:
-	if (!softpll.mpll.phase_ld.locked) {
+	if (!(status & (1 << 16))) {
+	    phy_dbg("link down\n");
+	    rx_state.state = RX_RESET;
+	}
+	else if (!softpll.mpll.phase_ld.locked) {
+	    phy_dbg("pll unlocked\n");
 	    softpll.mpll.rxpi_ready = 0;
 	    rx_state.state = RX_WAIT_FREQ_LOCK;
 	}

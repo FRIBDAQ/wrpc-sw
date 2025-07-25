@@ -253,18 +253,19 @@ void mpll_stop(struct spll_main_state *s)
 
 void mpll_update(struct spll_main_state *s, int tag, int source)
 {
-	if(!s->enabled)
-		return;
-
 	int err, y;
+	int ref_dt;
+
+	if (!s->enabled)
+	  return;
 
 	if (source != s->id_ref)
 		return;
 
-	/* Capture ref tag (RX clock) and compute delta. */
+	/* Compute delta of RX clock (and sign extend) */
+	ref_dt = tag - s->tag_ref;
+	ref_dt = (ref_dt << 10) >> 10;
 	s->tag_ref = tag;
-	s->dref_dt = tag - s->tag_ref_d;
-	s->tag_ref_d = s->tag_ref;
 
 	/* If there are both ref and out tags, ... */
 #if 0 /* ndef CONFIG_FRAC_SPLL */
@@ -293,23 +294,25 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 
 #endif
 
-	int freq_error = -s->dref_dt;
+	int freq_error = -ref_dt;
 
 	ld_update(&s->freq_ld, freq_error);
 
-	if ( s->freq_ld.lock_changed && s->freq_ld.locked )
-	{
+	if (s->freq_ld.lock_changed && s->freq_ld.locked) {
+		/* Just got frequency locked */
 		s->last_freq_lock_duration_ms = timer_get_tics() - s->lock_start_ms;
 		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_EVENT, 
 			   SPLL_DBG_EVT_FREQ_LOCK, 1);
+
+		s->adder_ref = -tag;
 	}
 
 	if( !s->freq_ld.locked )
 		err = -s->freq_prelock_gain_boost * freq_error;
 	else
-		err = s->adder_ref + s->tag_ref;
+		err = s->adder_ref + tag;
 
-#ifndef WITH_SEQUENCING
+#if 0 //ndef WITH_SEQUENCING
 
 	/* Hack: the PLL is locked, so the tags are close to
 	   each other. But when we start phase shifting, after
@@ -341,7 +344,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_CURRENT, s->phase_shift_current, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_TARGET, s->phase_shift_target, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TIME_MS, timer_get_tics(), 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_REF, s->dref_dt, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_REF, ref_dt, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->adder_ref, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_ERR, err, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_SAMPLE_ID, s->sample_n++, 0);
@@ -350,7 +353,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (s->locked
 	    && !s->ps_freeze
 	    && s->phase_shift_current != s->phase_shift_target) {
-		const int maxdelta = 160;
+		const int maxdelta = 16384 / 20;
 		int delta = s->phase_shift_current - s->phase_shift_target;
 		if (delta > maxdelta)
 			delta = maxdelta;

@@ -43,6 +43,8 @@ void ptracker_start(struct spll_ptracker_state *s)
 #undef HPLL_N
 #define HPLL_N 22
 
+#define PHASE_MAX ((16000 / 200) << 14)
+
 void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 		      int source)
 {
@@ -92,8 +94,18 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 		s->avg_count ++;
 
 		if (s->avg_count == s->n_avg) {
-			s->phase_val = (s->acc / s->n_avg) + s->offset;
-			s->ready = 1;
+			int phase = (s->acc / s->n_avg) + s->offset;
+			if (phase > PHASE_MAX) {
+				phase -= PHASE_MAX;
+				s->offset -= PHASE_MAX;
+			}
+			else if (phase < 0) {
+				phase += PHASE_MAX;
+				s->offset += PHASE_MAX;
+			}
+			else
+				s->ready = 1;
+			s->phase_val = phase;
 			s->acc = 0;
 			s->avg_count = 0;
 		}

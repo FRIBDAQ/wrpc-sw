@@ -473,6 +473,7 @@ int spll_read_ptracker(int channel, int32_t *phase_ps, int *enabled)
 {
 	volatile struct spll_ptracker_state *st = &softpll.ptrackers[channel];
 	int phase = st->phase_val;
+#if 0
 	if (phase < 0)
 		phase += (1 << HPLL_N);
 	else if (phase >= (1 << HPLL_N))
@@ -482,6 +483,7 @@ int spll_read_ptracker(int channel, int32_t *phase_ps, int *enabled)
 		phase <<= 1;
 		phase &= (1 << HPLL_N) - 1;
 	}
+#endif
 
 	*phase_ps = to_picos(phase);
 	if (enabled)
@@ -521,9 +523,9 @@ void ptracker_show_stats(void)
 			(struct spll_ptracker_state *)&softpll.ptrackers[ch];
 		int32_t phase;
 		spll_read_ptracker(ch, &phase, NULL);
-		pp_printf("ptrack %d: en %d id %d ready %d phase %d (%d ps) avg %d\n",
+		pp_printf("ptrack %d: en %d id %d ready %d phase %d (%d ps) avg %d (offset:%d)\n",
 			  ch, s->enabled, s->id, s->ready,
-			  s->phase_val, (int)phase, s->n_avg);
+			  s->phase_val, (int)phase, s->n_avg, s->offset);
 	}
 }
 
