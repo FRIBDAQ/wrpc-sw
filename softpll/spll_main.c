@@ -267,10 +267,10 @@ static inline void update_dtag_dt( int *dtag_dt, int tag, int *tag_d )
 }
 //#endif
 
-int mpll_update(struct spll_main_state *s, int tag, int source)
+void mpll_update(struct spll_main_state *s, int tag, int source)
 {
 	if(!s->enabled)
-	    return SPLL_LOCKED;
+		return;
 
 	int err, y;
 
@@ -502,13 +502,8 @@ int mpll_update(struct spll_main_state *s, int tag, int source)
 			}
 
 			mpll_handle_gain_schedule(s);
-
-			if(s->locked)
-				return SPLL_LOCKED;
 		}
 	}
-
-	return SPLL_LOCKING;
 }
 
 #ifdef CONFIG_WRPC_PPSI /* use __div64_32 from ppsi library to save libgcc memory */
