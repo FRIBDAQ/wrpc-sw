@@ -140,6 +140,14 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	    phy_dbg("ph_ps:%d tag_ps:%d diff_ps:%d sub_tag:%04x\n",
 		    ph_ps, tag_ps, ph_ps - tag_ps, sub_tag);
 
+	    /* Due to routing or transceiver layout, rxpi and sweep phases
+	       are not equal.
+	       Assume rxpi is always in advance wrt sweep.  If it isn't, there
+	       was a rollover which needs to be fixed.
+	       If the assumption is not correct, then it is always late.  We
+	       are just adding a delay, which will be fixed by calibration.
+	       FIXME: the only problem is the 'always'.  Can the skew sign
+	       change with PVT ?  */
 	    if (ph_ps >= tag_ps)
 		phase += 56 / 4;
 
@@ -174,6 +182,7 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	    state->state = SWEEP_ERROR;
 	}
 	else {
+	    /* Rising edge still not detected, continue phase shifting */
 	    regs->ps_ctrl = RXPI_GTHE4_MAP_PS_CTRL_SHIFT
 		| RXPI_GTHE4_MAP_PS_CTRL_INCDEC;
 	    state->state = SWEEP_WAIT_LOCK;
