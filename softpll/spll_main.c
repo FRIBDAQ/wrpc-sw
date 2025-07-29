@@ -116,8 +116,8 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 #endif
 	s->enabled = 0;
 
-	/* Freqency branch lock detection */
-	s->freq_ld.threshold = 50;
+	/* Frequency branch lock detection */
+	s->freq_ld.threshold = (1 << 14) / 128; /* ~1.5ps */
 	s->freq_ld.lock_samples = 50;
 	s->freq_ld.delock_samples = 20000;
 
@@ -262,6 +262,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (source != s->id_ref)
 		return;
 
+	/* NB: a tag unit is 200ps >> 14 */
 	/* Compute delta of RX clock (and sign extend) */
 	ref_dt = tag - s->tag_ref;
 	ref_dt = (ref_dt << 10) >> 10;
@@ -353,7 +354,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (s->locked
 	    && !s->ps_freeze
 	    && s->phase_shift_current != s->phase_shift_target) {
-		const int maxdelta = 16384 / 20;
+	        const int maxdelta = (1 << 14) / 20; /* 10ps */
 		int delta = s->phase_shift_current - s->phase_shift_target;
 		if (delta > maxdelta)
 			delta = maxdelta;
