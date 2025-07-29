@@ -82,6 +82,7 @@ int wrc_mon_gui(void);
 void redraw_gui(void);
 int wrc_log_stats(void);
 void shell_init(void);
+int wrc_wr_diags(void);
 
 /* Default width (in 8ns/16ns units) of the pulses on the PPS output */
 #define PPS_WIDTH (10 * 1000 * 1000 / NS_PER_CLOCK) /* 10ms */

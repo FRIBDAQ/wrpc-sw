@@ -7,11 +7,13 @@
  * Released according to the GNU LGPL, version 2.1 or any later version.
  */
 
-#include <wrpc.h>
+#include "wrpc.h"
+#include "wrc.h"
 #include "board.h"
 #include "wrc-debug.h"
 #include "wrc-event.h"
 #include "event.h"
+#include "events-ptp.h"
 
 static int prev_ptp_mode;
 static int prev_ptp_state;

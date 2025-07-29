@@ -167,7 +167,7 @@ void ertm15_rf_distr_init( struct ertm15_rf_distribution_device *dev, struct ad7
 #define INV_LOG2_E_Q1DOT31  (0x58b90bfcULL) // Inverse log base 2 of e
 #define INV_LOG2_10_Q1DOT31 (0x268826a1ULL) // Inverse log base 2 of 10
 
-int64_t log2fix (uint64_t x, size_t precision)
+static int64_t log2fix (uint64_t x, size_t precision)
 {
     // This implementation is based on Clay. S. Turner's fast binary logarithm
     // algorithm[1].
@@ -209,7 +209,7 @@ int64_t log2fix (uint64_t x, size_t precision)
     return y;
 }
 
-int32_t log10fix (uint64_t x, size_t precision)
+static int32_t log10fix (uint64_t x, size_t precision)
 {
     uint64_t t;
 

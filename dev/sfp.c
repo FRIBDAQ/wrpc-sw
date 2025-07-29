@@ -203,14 +203,6 @@ static void sfp_i2c_write(uint8_t addr, uint8_t reg, uint8_t * data, uint16_t le
 #endif
 }
 
-/* reset i2c bus
- * can be useful if WRPC was reset in the middle of i2c transaction */
-void sfp_i2c_reset(void)
-{
-
-
-}
-
 /* selects the page for the upper 128 bytes of address space A2 */
 void sfp_a2_select_page(uint8_t page)
 {

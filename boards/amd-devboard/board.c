@@ -257,7 +257,8 @@ static const expansion_card_support_t board_card_compatibility[NUM_SUPPORTED_BOA
  * generic I2C MUX configuration, assuming the process of enabling channels
  * consists of simply writing a bitmask to some I2C address.
  */
-void amd_devboard_generic_i2c_mux_apply_cfg(struct i2c_bus *i2c_bus, const i2c_mux_cfg_t *i2c_mux_cfg) {
+static void amd_devboard_generic_i2c_mux_apply_cfg(struct i2c_bus *i2c_bus, const i2c_mux_cfg_t *i2c_mux_cfg)
+{
 	bb_i2c_start(i2c_bus);
 	bb_i2c_put_byte(i2c_bus, i2c_mux_cfg->addr << 1);
 	bb_i2c_put_byte(i2c_bus, i2c_mux_cfg->ch_bitmask);
@@ -487,7 +488,7 @@ static void amd_devboard_si5324_init(void)
 	}
 }
 
-int wrc_board_early_init()
+int wrc_board_early_init(void)
 {
 	/*
 	 * fetch specific board type from SYSCON
@@ -635,7 +636,7 @@ int wrc_board_early_init()
 	return ret;
 }
 
-int wrc_board_init()
+int wrc_board_init(void)
 {
 	uint8_t mac_addr[6];
 
@@ -660,7 +661,7 @@ int wrc_board_init()
 	return 0;
 }
 
-int wrc_board_create_tasks()
+int wrc_board_create_tasks(void)
 {
 	return 0;
 }

@@ -17,7 +17,7 @@
 
 static struct wrc_sensor *sensors = NULL;
 
-const char* sensor_type_string( uint8_t flags )
+static const char* sensor_type_string( uint8_t flags )
 {
 	if ( flags & WRC_SENSOR_TEMP_CELSIUS )
 		return "Temperature";
@@ -29,7 +29,7 @@ const char* sensor_type_string( uint8_t flags )
 		return "?";
 }
 
-const char* sensor_unit_string( uint8_t flags )
+static const char* sensor_unit_string( uint8_t flags )
 {
 	if ( flags & WRC_SENSOR_TEMP_CELSIUS )
 		return "degC";

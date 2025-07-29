@@ -19,6 +19,7 @@
 
 #include "board.h"
 #include "dev/gpio.h"
+#include "gpio-wrs.h"
 
 #define GPIO_SYS_CLK_SEL	0
 #define GPIO_PLL_RESET_N	1

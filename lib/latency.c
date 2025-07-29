@@ -15,6 +15,8 @@
 #include "ppsi/jiffies.h" /* time_before() */
 #include "dev/netif.h"
 #include "lib/syslog.h"
+#include "latency.h"
+
 #define jiffies timer_get_tics()
 
 #ifdef CONFIG_LATENCY_SYSLOG

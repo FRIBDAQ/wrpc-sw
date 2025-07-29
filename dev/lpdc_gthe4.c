@@ -26,17 +26,18 @@
 */
 
 #include <string.h>
-#include <board.h>
+#include "board.h"
 #include "dev/syscon.h"
 #include "dev/endpoint.h"
-#include <softpll_ng.h>
+#include "softpll_ng.h"
 #include "storage.h"
 #include "util.h"
 #include "wrc-debug.h"
 #include "wrc-task.h"
+#include "lpdc.h"
 
-#include <hw/ep_mdio_regs.h>
-#include <hw/lpdc_mdio_regs.h>
+#include "hw/ep_mdio_regs.h"
+#include "hw/lpdc_mdio_regs.h"
 
 /* TX Target phase is measured at tx_out_clk of the PHY.
    Clk_ref_62m5 and tx_out_clk are phase locked but have an offset.

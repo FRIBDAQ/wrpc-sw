@@ -8,7 +8,12 @@
  */
 #include <stdint.h>
 #include <stdarg.h>
-#include <wrc.h>
+#include <string.h>
+#include "wrc.h"
+
+/* Called directly by gcc */
+extern long long __divdi3 (long long A, long long B);
+extern unsigned long long __umoddi3 (unsigned long long A, unsigned long long B);
 
 /* cut from libc sources */
 
@@ -292,6 +297,9 @@ int atoi(const char *s)
 	fromdec(s, &res);
 	return res;
 }
+
+/* Not used */
+void dump_mem(uint8_t *p, int size);
 
 /* Quick and dirty function to be used for debugging to dump the memory */
 void dump_mem(uint8_t *p, int size)

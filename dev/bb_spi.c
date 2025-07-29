@@ -174,7 +174,7 @@ void bb_spi_create( struct spi_bus *bus,
     gen_gpio_set_dir( bus->pin_sck, 1 );
 }
 
-void bb_spi_test(struct spi_bus *bus)
+static void __attribute__((unused)) bb_spi_test(struct spi_bus *bus)
 {
     pp_printf("Testing SPI bus: CS = 1 pulse, SCK = 2 pulses, MOSI = 3 pulses\n");
     for(;;)

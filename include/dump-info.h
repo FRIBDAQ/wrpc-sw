@@ -136,3 +136,7 @@ int wrpc_get_i32(const void *p);
 int wrpc_get_16(const void *p);
 uint8_t wrpc_get_8(const void *p);
 void print_str(char *s);
+
+void dump_mem_ppsi_wrpc(void *mapaddr, unsigned long ppg_off);
+void dump_one_field_ppsi_wrpc(int type, int size, void *p, int i);
+int dump_one_field_type_ppsi_wrpc(int type, int size, void *p);

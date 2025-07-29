@@ -17,6 +17,7 @@
 #include "hw/etherbone-config.h"
 #include "wrpc.h"
 #include "wrc_global.h"
+#include "syslog.h"
 
 #define myIP      wrc_global_link.ip_addr
 
@@ -32,12 +33,17 @@ static struct wrpc_socket *icmp_socket;
 static DECLARE_WRPC_SOCKET(rdate_socket, 96);
 static struct wrpc_socket *rdate_socket;
 
-/* syslog is selected by Kconfig, so we have weak aliases here */
-void __attribute__((weak)) syslog_init(void)
-{ }
+#ifndef CONFIG_SYSLOG
+/* When syslog is not enabled... */
+void syslog_init(void)
+{
+}
 
-int __attribute__((weak)) syslog_poll(void)
-{ return 0; }
+int syslog_poll(void)
+{
+  return 0;
+}
+#endif
 
 unsigned int ipv4_checksum(unsigned short *buf, int shorts)
 {

@@ -8,6 +8,7 @@
  */
 #include "board.h"
 #include "hw/etherbone-config.h"
+#include "dev/etherbone.h"
 
 void eb_setIP(unsigned char *IP)
 {

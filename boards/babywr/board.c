@@ -160,14 +160,14 @@ static int sit5359_dev_init( struct wr_sit5359_interface_device *dev )
     return 0;
 }
 
-int conv_twos_compl (int val) {
+static int conv_twos_compl (int val) {
     if (val < DAC_HALF_SCALE)
         return (DAC_FULL_SCALE - (~(val - DAC_HALF_SCALE) + 1));
     else
         return(val - DAC_HALF_SCALE);
 }
 
-int regs2dac (uint8_t *regs)
+static int __attribute__((unused)) regs2dac (uint8_t *regs)
 {
     int dac_twos = (((regs[1] & 0xff) << (SIT5359_DFC_BITS-26)) | // SiT5359 Reg 0x00 7:0  => DFC-LSW[7:0]
                     ((regs[0] & 0xff) << (SIT5359_DFC_BITS-18)) | // SiT5359 Reg 0x00 15:8 => DFC-LSW[15:8]
@@ -177,7 +177,7 @@ int regs2dac (uint8_t *regs)
     return conv_twos_compl(dac_twos);
 }
 
-void dac2regs (uint32_t dac, uint8_t * regs)
+static void dac2regs (uint32_t dac, uint8_t * regs)
 {
     int dac_twos = conv_twos_compl(dac);
     const char SITIME_OE = 0x04;            // bit 2 of register regs[2] = bit 10 of SiTime address 0x01
