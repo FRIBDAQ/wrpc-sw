@@ -287,6 +287,8 @@ void spll_init(int mode, int slave_ref_channel, int flags)
 
 	struct softpll_state *s = (struct softpll_state *) &softpll;
 
+	phy_dbg("spll_init(%d,%d)\n", mode, slave_ref_channel);
+
 	disable_irq();
 
 	uint32_t csr = SPLL->CSR;
