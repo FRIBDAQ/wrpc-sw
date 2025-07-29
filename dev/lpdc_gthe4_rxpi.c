@@ -26,6 +26,9 @@
 #include "util.h"
 #include "wrc-debug.h"
 #include "shell.h"
+#include "lpdc.h"
+
+#include "hw/ep_mdio_regs.h"
 
 #include <hw/rxpi_gthe4_map.h>
 
@@ -122,11 +125,11 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	    /* Phase shift clock vco is running at 1250Mhz, so the
 	       period is 800ps.
 	       A shift is 800ps/56 */
-	    phy_dbg("phase result ph0:%u.%02u ph1:%u.%02u ph:%u.%02u phps:%ups val:%u res:%08x\n",
+	    phy_dbg("phase result ph0:%u.%02u ph1:%u.%02u ph:%u.%02u phps:%ups\n",
 		    state->phase_0 / 56, state->phase_0 % 56,
 		    phase_1 / 56, phase_1 % 56,
 		    phase / 56, phase % 56,
-		    phase * 800 / 56, val, res);
+		    phase * 800 / 56);
 
 
 	    /* To compute the absolute phase, we need to combine the phase
@@ -201,14 +204,18 @@ int phy_calibration_poll(void)
 
     status = regs->status;
     switch (rx_state.state) {
-    case RX_RESET:
-	phy_dbg("reset rx\n");
-	regs->reset |= RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
-	regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
-	tmo_init(&rx_state.timeout, 200);
-	rx_state.state = RX_WAIT_RESET;
+    case RX_RESET: {
+	struct wr_endpoint_device* dev = &wrc_endpoint_dev;
+	if ((ep_pcs_read(dev, EP_MDIO_MCR) & EP_MDIO_MCR_PDOWN) == 0) {
+	    phy_dbg("reset rx\n");
+	    regs->reset |= RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
+	    regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
+	    tmo_init(&rx_state.timeout, 200);
+	    rx_state.state = RX_WAIT_RESET;
+	}
 	softpll.mpll.rxpi_ready = 0;
 	break;
+    }
     case RX_WAIT_RESET:
 	if (tmo_expired(&rx_state.timeout)) {
 	    regs->reset &= ~RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
@@ -253,7 +260,7 @@ int phy_calibration_poll(void)
 	rxpi_sweep_fsm(&rx_state.sweep);
 	if (rx_state.sweep.state == SWEEP_DONE) {
 	    softpll.mpll.phase_shift_current = rx_state.sweep.abs_phase;
-	    softpll.mpll.phase_shift_target = rx_state.sweep.abs_phase;
+	    softpll.mpll.phase_shift_target = 0;
 	    softpll.ptrackers[0].offset = -rx_state.sweep.delta;
 	    softpll.mpll.rxpi_ready = 1;
 	    rx_state.state = RX_READY;
