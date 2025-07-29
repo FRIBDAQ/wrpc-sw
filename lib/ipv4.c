@@ -82,7 +82,9 @@ void ipv4_init(void)
 	  (GET_WRPC_SOCKET(icmp_socket), LEN_WRPC_SOCKET(icmp_socket),
 	   &saddr, PTPD_SOCK_RAW_ETHERNET, 0, nif);
 
+#ifdef CONFIG_SYSLOG
 	syslog_init();
+#endif
 }
 
 static uint16_t bootp_retry = 0;
@@ -189,7 +191,9 @@ int ipv4_poll(void)
 
 	ret += rdate_poll();
 
+#ifdef CONFIG_SYSLOG
 	ret += syslog_poll();
+#endif
 
 	return ret != 0;
 }
