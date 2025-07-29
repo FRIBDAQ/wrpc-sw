@@ -40,7 +40,7 @@
 
 /* how finely we scan the phase shift range to determine where we have the bit
  * flip */
-#define CAL_SCAN_STEP 200
+#define CAL_SCAN_STEP 100
 
 /* deglitcher threshold (to remove 1->0->1 flip bit glitches that might occur
    due to jitter) */
@@ -131,6 +131,8 @@ void calib_t24p_init(void)
 	det_rising.trans_phase = 0;
 	det_falling.trans_phase = 0;
 	spll_set_phase_shift(0, 0);
+	
+	phy_dbg("RXTS calib init\n");
 }
 
 /* Updates RX timestamper state machine. Non-zero return value means that
@@ -189,7 +191,7 @@ static int rxts_calibration_update(uint32_t *t24p_value)
 
 	spll_set_phase_shift(0, cal_cur_phase);
 
-	phy_dbg("RXTS calibration: set phase to %dps\n", cal_cur_phase);
+	phy_dbg("RXTS calib: %dps\n", cal_cur_phase);
 
 	return 0;
 }
