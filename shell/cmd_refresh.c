@@ -11,10 +11,11 @@
 
     Description: Configures time interval to update gui/stat statistics by monitor. */
 
-#include <wrc.h>
+#include "wrc.h"
 #include "shell.h"
+#include "cmds.h"
 
-static int cmd_refresh(const char *args[])
+int cmd_refresh(const char *args[])
 {
 	int sec;
 
@@ -29,8 +30,3 @@ static int cmd_refresh(const char *args[])
 	wrc_ui_refperiod = sec*TICS_PER_SECOND;
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(refresh) = {
-	.name = "refresh",
-	.exec = cmd_refresh,
-};

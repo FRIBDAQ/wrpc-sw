@@ -194,7 +194,6 @@ extern struct ertm14_board board;
 void ertm14_config_init(void);
 struct ertm14_board_state *ertm14_get_current_state(void);
 int ertm14_get_clkab_divider( int freq );
-void ertm14_shell_init(void);
 void ertm14_apply_config(struct ertm14_board_state *cfg,
 	struct ertm14_board_state *mask, int force_all);
 void ertm14_set_pps_out_mode(int mode);

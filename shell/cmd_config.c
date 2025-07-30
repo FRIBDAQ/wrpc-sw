@@ -8,19 +8,15 @@
  */
 #include <stdlib.h>
 #include <string.h>
-#include <wrc.h>
-#include <shell.h>
+#include "wrc.h"
+#include "shell.h"
+#include "cmds.h"
 
 extern char _binary__config_bin_start[];
 
-static int cmd_config(const char *args[])
+int cmd_config(const char *args[])
 {
 	pp_printf("  Current WRPC-SW configuration:\n");
 	puts(_binary__config_bin_start);
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(config) = {
-	.name = "config",
-	.exec = cmd_config,
-};

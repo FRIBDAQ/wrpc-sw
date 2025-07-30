@@ -12,6 +12,7 @@
 #include "libsdbfs.h"
 #include "util.h"
 #include "wrc.h"
+#include "cmds.h"
 
 /*
  * args[1] - where to write sdbfs image (0 - Flash, 1 - I2C EEPROM,
@@ -63,7 +64,7 @@ static void cmd_sdb_rdump(unsigned off)
 }
 #endif
 
-static int cmd_sdb(const char *args[])
+int cmd_sdb(const char *args[])
 {
 	int icmd;
 
@@ -117,8 +118,3 @@ static int cmd_sdb(const char *args[])
 		return icmd;
 	}
 }
-
-DEFINE_WRC_COMMAND(sdb) = {
-	.name = "sdb",
-	.exec = cmd_sdb,
-};

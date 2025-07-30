@@ -12,6 +12,8 @@
 #include "shell.h"
 #include "ipv4.h"
 #include "syslog.h"
+#include "cmds.h"
+
 /* syslog: a tx-only socket: no queue is there */
 static DECLARE_WRPC_SOCKET(syslog_socket, 0);
 static struct wrpc_socket *syslog_socket;
@@ -32,7 +34,7 @@ void syslog_init(void)
 	tics_zero = timer_get_tics();
 }
 
-static int cmd_syslog(const char *args[])
+int cmd_syslog(const char *args[])
 {
 	char b1[32], b2[32];
 	char *p;
@@ -65,11 +67,6 @@ static int cmd_syslog(const char *args[])
 	tics = 0; /* send the first frame immediately to the new host */
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(syslog) = {
-	.name = "syslog",
-	.exec = cmd_syslog,
-};
 
 #define SYSLOG_DEFAULT_LEVEL 14 /* 8 == user + 6 ==info */
 static int syslog_header(char *buf, int level, unsigned char ip[4])

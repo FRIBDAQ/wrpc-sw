@@ -26,6 +26,8 @@
 #include "shell.h"
 #include "storage.h"
 #include "lib/syslog.h"
+#include "board.h"
+#include "cmds.h"
 
 /* interactive shell state definitions */
 
@@ -46,92 +48,21 @@
 #define KEY_BACKSPACE (127)
 #define KEY_DELETE (126)
 
-#ifdef CONFIG_CMD_PPS
-#define HAS_CMD_PPS 1
-#else
-#define HAS_CMD_PPS 0
-#endif
-
-#ifdef CONFIG_CMD_LEAPSEC
-#define HAS_CMD_LEAPSEC 1
-#else
-#define HAS_CMD_LEAPSEC 0
-#endif
-
-#ifdef CONFIG_CMD_LL
-#define HAS_CMD_LL 1
-#else
-#define HAS_CMD_LL 0
-#endif
-
-#ifdef CONFIG_AUX_DIAG
-#define HAS_CMD_DIAG 1
-#else
-#define HAS_CMD_DIAG 0
-#endif
-
-#ifdef CONFIG_CMD_NETCONSOLE
-#define HAS_CMD_NETCONSOLE 1
-#else
-#define HAS_CMD_NETCONSOLE 0
-#endif
-
-#ifdef CONFIG_CMD_CONFIG
-#define HAS_CMD_CONFIG 1
-#else
-#define HAS_CMD_CONFIG 0
-#endif
-
-#ifdef CONFIG_CMD_REFRESH
-#define HAS_CMD_REFRESH 1
-#else
-#define HAS_CMD_REFRESH 0
-#endif
-
-#ifdef CONFIG_LATENCY_PROBE
-#define HAS_LATENCY_PROBE 1
-#else
-#define HAS_LATENCY_PROBE 0
-#endif
-
-#ifdef CONFIG_GENERIC_SENSORS
-#define HAS_GENERIC_SENSORS 1
-#else
-#define HAS_GENERIC_SENSORS 0
-#endif
-
-#ifdef CONFIG_FREQUENCY_MONITOR
-#define HAS_FREQUENCY_MONITOR 1
-#else
-#define HAS_FREQUENCY_MONITOR 0
-#endif
-
-#ifdef CONFIG_CMD_AUXCLK
-#define HAS_CMD_AUXCLK 1
-#else
-#define HAS_CMD_AUXCLK 0
-#endif
-
-#ifdef CONFIG_CMD_NMEA
-#define HAS_CMD_NMEA 1
-#else
-#define HAS_CMD_NMEA 0
-#endif
-
-#ifdef CONFIG_CMD_AUXTMG
-#define HAS_CMD_AUXTMG 1
-#else
-#define HAS_CMD_AUXTMG 0
-#endif
-
-
 static char cmd_buf[SH_MAX_LINE_LEN + 1];
 static int cmd_pos = 0, cmd_len = 0;
 static unsigned char state = SH_PROMPT;
 static uint16_t current_key = 0;
 
-static const struct wrc_shell_cmd *cmds[ SHELL_MAX_COMMANDS ];
-static int n_cmds = 0;
+struct wrc_shell_cmd {
+	const char *name;
+	int (*exec) (const char *args[]);
+};
+
+static const struct wrc_shell_cmd cmds[] = {
+#define WRC_COMMAND2(name, func) { #name, cmd_##func },
+#include "cmds.h"
+#undef WRC_COMMAND2
+};
 
 unsigned char shell_is_interacting;
 int (*shell_ui_callback)(void);
@@ -221,9 +152,9 @@ static int _shell_exec(void)
 	if (*tokptr[0] == '#')
 		return 0;
 
-	for (i = 0; i < n_cmds; i++)
+	for (i = 0; i < ARRAY_SIZE(cmds); i++)
 	{
-		p = cmds[i];
+		p = &cmds[i];
 		if (!strcasecmp(p->name, tokptr[0])) {
 			rv = p->exec(tokptr + 1);
 			if (rv < 0)
@@ -440,17 +371,6 @@ void shell_show_build_init(void)
 }
 
 
-void shell_register_command(const struct wrc_shell_cmd* cmd)
-{
-	if( n_cmds >= SHELL_MAX_COMMANDS )
-	{
-		pp_printf("can't register shell command '%s', increase SHELL_MAX_COMMANDS\n", cmd->name );
-		return;
-	}
-	cmds[ n_cmds ] = cmd;
-	n_cmds++;
-}
-
 void shell_activate_ui_command( int (*callback)(void) )
 {
 	shell_ui_callback = callback;
@@ -459,95 +379,14 @@ void shell_activate_ui_command( int (*callback)(void) )
 	cmd_len = 0;
 }
 
-static int cmd_help(const char *args[])
+int cmd_help(const char *args[])
 {
 	int i;
 	pp_printf("Available commands:\n");
 
-	for(i = 0; i < n_cmds; i++) {
-		pp_printf(" %s\n", cmds[i]->name);
+	for(i = 0; i < ARRAY_SIZE(cmds); i++) {
+		pp_printf(" %s\n", cmds[i].name);
 	}
 
 	return 0;
-}
-
-static DEFINE_WRC_COMMAND(help) = {
-	.name = "help",
-	.exec = cmd_help,
-};
-
-#define REGISTER_WRC_COMMAND(_name) \
-	{ extern const struct wrc_shell_cmd __wrc_cmd_ ## _name; shell_register_command( &__wrc_cmd_ ## _name ); }
-
-void shell_register_commands(void)
-{
-	REGISTER_WRC_COMMAND(calibration);
-	if (HAS_CMD_CONFIG)
-		REGISTER_WRC_COMMAND(config);
-	if (HAS_DAC_LOG)
-		REGISTER_WRC_COMMAND(daclog);
-	if (HAS_CMD_LL)
-		REGISTER_WRC_COMMAND(delays);
-	if (HAS_CMD_LL)
-		REGISTER_WRC_COMMAND(devmem);
-	if (HAS_CMD_DIAG)
-		REGISTER_WRC_COMMAND(diag);
-	if (HAS_TEMP_FAKE)
-		REGISTER_WRC_COMMAND(faketemp);
-	REGISTER_WRC_COMMAND(gui);
-	REGISTER_WRC_COMMAND(help);
-	REGISTER_WRC_COMMAND(init);
-	if (HAS_IP)
-		REGISTER_WRC_COMMAND(ip);
-	if (HAS_CMD_LEAPSEC)
-		REGISTER_WRC_COMMAND(leapsec);
-	if (HAS_LATENCY_PROBE)
-		REGISTER_WRC_COMMAND(ltest);
-	REGISTER_WRC_COMMAND(mac);
-	REGISTER_WRC_COMMAND(mode);
-	if (HAS_CMD_NETCONSOLE)
-		REGISTER_WRC_COMMAND(netconsole);
-	REGISTER_WRC_COMMAND(pll);
-	if (HAS_CMD_PPS)
-		REGISTER_WRC_COMMAND(pps);
-#ifdef CONFIG_CMD_EP
-	REGISTER_WRC_COMMAND(ep);
-#endif
-	REGISTER_WRC_COMMAND(ps);
-	REGISTER_WRC_COMMAND(ptp);
-	REGISTER_WRC_COMMAND(ptrack);
-	if (HAS_CMD_REFRESH)
-		REGISTER_WRC_COMMAND(refresh);
-	REGISTER_WRC_COMMAND(sdb);
-	REGISTER_WRC_COMMAND(sfp);
-	REGISTER_WRC_COMMAND(sleep);
-	REGISTER_WRC_COMMAND(stat);
-	if (HAS_SYSLOG)
-		REGISTER_WRC_COMMAND(syslog);
-	if (HAS_TEMP_SENSORS)
-		REGISTER_WRC_COMMAND(temp);
-	if (HAS_GENERIC_SENSORS)
-		REGISTER_WRC_COMMAND(sensors);
-	REGISTER_WRC_COMMAND(time);
-	REGISTER_WRC_COMMAND(uptime);
-	REGISTER_WRC_COMMAND(ver);
-	REGISTER_WRC_COMMAND(verbose);
-	if (HAS_VLANS)
-		REGISTER_WRC_COMMAND(vlan);
-	if (HAS_W1_TEMP)
-		REGISTER_WRC_COMMAND(w1);
-	if (HAS_W1_EEPROM) {
-		REGISTER_WRC_COMMAND(w1r);
-		REGISTER_WRC_COMMAND(w1w);
-	}
-	if( HAS_FREQUENCY_MONITOR )
-		REGISTER_WRC_COMMAND(freqmon);
-	if(HAS_CMD_AUXCLK)
-		REGISTER_WRC_COMMAND(auxclk);
-	if(HAS_CMD_NMEA){
-		REGISTER_WRC_COMMAND(nmea);
-	}
-	if(HAS_CMD_AUXTMG)
-		REGISTER_WRC_COMMAND(auxtmg);
-
 }

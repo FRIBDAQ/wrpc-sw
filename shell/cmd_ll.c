@@ -6,16 +6,16 @@
  *
  * Released according to the GNU GPL, version 2 or any later version.
  */
-#include <wrc.h>
-#include <shell.h>
-#include <storage.h>
-#include <dev/endpoint.h>
-#include <ppsi/ppsi.h>
-#include <ppsi/ppsi.h>
+#include "wrc.h"
+#include "shell.h"
+#include "storage.h"
+#include "dev/endpoint.h"
+#include "ppsi/ppsi.h"
+#include "cmds.h"
 
 extern struct pp_globals *ppg;
 
-static int cmd_devmem(const char *args[])
+int cmd_devmem(const char *args[])
 {
 	uint32_t *addr, value;
 
@@ -33,12 +33,7 @@ static int cmd_devmem(const char *args[])
 	return 0;
 }
 
-DEFINE_WRC_COMMAND(devmem) = {
-	.name = "devmem",
-	.exec = cmd_devmem,
-};
-
-static int cmd_delays(const char *args[])
+int cmd_delays(const char *args[])
 {
 	wrh_servo_t * wr_servo;
 	wr_servo_ext_t * wr_servo_ext = NULL;
@@ -74,8 +69,3 @@ static int cmd_delays(const char *args[])
 	}
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(delays) = {
-	.name = "delays",
-	.exec = cmd_delays,
-};

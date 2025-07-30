@@ -8,6 +8,7 @@
 #include <string.h>
 #include "wrpc.h"
 #include "shell.h"
+#include "cmds.h"
 
 #ifdef CONFIG_CMD_PTP_ADV
 # define CONFIG_CMD_PTP_BMC
@@ -102,7 +103,7 @@ static const char * const is_mode[] = {[WRC_MODE_GM] = "gm",
 #endif
 			 };
 
-static int cmd_ptp(const char *args[])
+int cmd_ptp(const char *args[])
 {
 	int i, j, ret;
 	const struct subcmd *c;
@@ -149,12 +150,3 @@ static int cmd_ptp(const char *args[])
 	}
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(ptp) = {
-	.name = "ptp",
-	.exec = cmd_ptp,
-};
-DEFINE_WRC_COMMAND(mode) = {
-	.name = "mode",
-	.exec = cmd_ptp,
-};

@@ -6,15 +6,16 @@
  *
  * Released according to the GNU GPL, version 2 or any later version.
  */
+#include <string.h>
+#include <errno.h>
 #include "shell.h"
 #include "dev/endpoint.h"
-#include <string.h>
-#include <wrc.h>
-#include <errno.h>
+#include "wrc.h"
+#include "cmds.h"
 
 int wrc_stat_running;
 
-static int cmd_stat(const char *args[])
+int cmd_stat(const char *args[])
 {
 	/* no arguments: invert */
 	if (!args[0]) {
@@ -42,8 +43,3 @@ static int cmd_stat(const char *args[])
 	return 0;
 
 }
-
-DEFINE_WRC_COMMAND(stat) = {
-	.name = "stat",
-	.exec = cmd_stat,
-};

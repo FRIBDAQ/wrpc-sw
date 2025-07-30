@@ -16,6 +16,7 @@
 #include "dev/netif.h"
 #include "lib/syslog.h"
 #include "latency.h"
+#include "cmds.h"
 
 #define jiffies timer_get_tics()
 
@@ -278,7 +279,7 @@ int latency_poll(void)
 
 
 
-static int cmd_ltest(const char *args[])
+int cmd_ltest(const char *args[])
 {
 	int v = 0, v1 = 0;
 
@@ -303,8 +304,3 @@ static int cmd_ltest(const char *args[])
 		  lat_verbose ? "verbose" : "quiet");
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(ltest) = {
-	.name = "ltest",
-	.exec = cmd_ltest,
-};

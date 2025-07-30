@@ -6,10 +6,11 @@
  *
  * Released according to the GNU GPL, version 2 or any later version.
  */
-#include <wrc.h>
+#include "wrc.h"
 #include "dev/temperature.h"
 #include "shell.h"
 #include "dev/temp-fake.h"
+#include "cmds.h"
 
 
 static struct wrc_temp_sensor temp_fake_data[] = {
@@ -25,7 +26,7 @@ static int temp_fake_refresh(struct wrc_temp_sensor *t)
 	return 0;
 }
 
-static int cmd_faketemp(const char *args[])
+int cmd_faketemp(const char *args[])
 {
 	int i;
 	const char *dot;
@@ -59,10 +60,3 @@ void temp_faketemp_init(void)
 	tbr.t = temp_fake_data;
 	wrc_temp_register(&tbr);
 }
-
-DEFINE_WRC_COMMAND(faketemp) = {
-	.name = "faketemp",
-	.exec = cmd_faketemp,
-};
-
-

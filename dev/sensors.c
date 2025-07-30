@@ -7,10 +7,11 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
-#include <wrc.h>
 #include <string.h>
-#include <sensors.h>
-#include <shell.h>
+#include "wrc.h"
+#include "sensors.h"
+#include "shell.h"
+#include "cmds.h"
 
 
 #ifdef CONFIG_GENERIC_SENSORS
@@ -93,7 +94,7 @@ struct wrc_sensor* wrc_sensor_find_by_type(uint8_t type)
  * The shell command
  */
 
-static int cmd_sensors(const char *args[])
+int cmd_sensors(const char *args[])
 {
 	pp_printf("Sensors readout: \n");
 
@@ -111,11 +112,5 @@ static int cmd_sensors(const char *args[])
 
 	return 0;
 }
-
-
-DEFINE_WRC_COMMAND(sensors) = {
-	.name = "sensors",
-	.exec = cmd_sensors,
-};
 
 #endif /* CONFIG_GENERIC_SENSORS */

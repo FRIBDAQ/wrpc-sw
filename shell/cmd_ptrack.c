@@ -8,11 +8,12 @@
  */
 
 #include <string.h>
-#include <wrc.h>
-#include <softpll_ng.h>
+#include "wrc.h"
+#include "softpll_ng.h"
 #include "shell.h"
+#include "cmds.h"
 #ifdef CONFIG_WRPC_PPSI
-#  include <ppsi/ppsi.h>
+#  include "ppsi/ppsi.h"
 #  include "proto-ext-whiterabbit/wr-api.h"
 #else
 #  include "ptpd.h"
@@ -28,7 +29,7 @@ static const char * const ptrack_cmds[] =
 };
 
 
-static int cmd_ptrack(const char *args[])
+int cmd_ptrack(const char *args[])
 {
 	int icmd = sub_cmd(ptrack_cmds, ARRAY_SIZE(ptrack_cmds), args);
 
@@ -69,8 +70,3 @@ static int cmd_ptrack(const char *args[])
 	}
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(ptrack) = {
-	.name = "ptrack",
-	.exec = cmd_ptrack,
-};

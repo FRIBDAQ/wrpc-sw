@@ -2955,8 +2955,6 @@ static int check_calibration_version(void)
 
 int wrc_board_init()
 {
-    ertm14_shell_init();
-
     evth_dds_nco_sync = event_listener_create();
     evth_clkab_sync = event_listener_create();
 

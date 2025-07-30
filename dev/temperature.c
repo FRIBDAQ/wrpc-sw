@@ -7,10 +7,11 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
-#include <wrc.h>
 #include <string.h>
-#include <dev/temperature.h>
-#include <shell.h>
+#include "wrc.h"
+#include "dev/temperature.h"
+#include "shell.h"
+#include "cmds.h"
 
 
 struct wrc_temp_group temp_sensors[WRC_MAX_TEMPERATURES];
@@ -142,7 +143,7 @@ int wrc_temp_refresh(void)
  * The shell command
  */
 
-static int cmd_temp(const char *args[])
+int cmd_temp(const char *args[])
 {
 	char buffer[80];
 
@@ -150,9 +151,3 @@ static int cmd_temp(const char *args[])
 	pp_printf("%s\n", buffer);
 	return 0;
 }
-
-
-DEFINE_WRC_COMMAND(temp) = {
-	.name = "temp",
-	.exec = cmd_temp,
-};

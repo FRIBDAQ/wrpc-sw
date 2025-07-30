@@ -9,13 +9,14 @@
 
 /* based on wrs_auxclk by Grzegorz Daniluk */
 
-#include <dev/syscon.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wrc.h>
+#include "dev/syscon.h"
+#include "wrc.h"
 #include "shell.h"
 #include "board.h"
-#include <hw/timecode_regs.h>
+#include "hw/timecode_regs.h"
+#include "cmds.h"
 
 #define NS_FACTOR 1000000000
 #define MAX_FREQ  250000000
@@ -87,7 +88,7 @@ static void print_settings(struct params *p)
   pp_printf("duty: %d%%\n", p->duty);
 }
 
-static int cmd_auxclk(const char *args[])
+int cmd_auxclk(const char *args[])
 {
 
   struct params req = {10000000, 0, 50, 0, 0};
@@ -125,8 +126,3 @@ static int cmd_auxclk(const char *args[])
   }
   return 0;
 }
-
-DEFINE_WRC_COMMAND(auxclk) = {
-  .name = "auxclk",
-  .exec = cmd_auxclk,
-};

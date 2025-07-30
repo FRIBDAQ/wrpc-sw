@@ -9,14 +9,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <wrc.h>
+#include "wrc.h"
 
 #include "shell.h"
 #include "storage.h"
 #include "net.h"
 #include "dev/endpoint.h"
 #include "ppsi/lib.h"
-
+#include "cmds.h"
 
 static void decode_port(const char *str, int *port)
 {
@@ -35,7 +35,7 @@ static const char * const mac_cmds[] =
 	 [3] = "setp",
 };
 
-static int cmd_mac(const char *args[])
+int cmd_mac(const char *args[])
 {
 	int icmd;
 	unsigned char mac[6];
@@ -78,8 +78,3 @@ static int cmd_mac(const char *args[])
 	pp_printf("MAC-address: %s\n", format_mac(buf, mac));
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(mac) = {
-	.name = "mac",
-	.exec = cmd_mac,
-};
