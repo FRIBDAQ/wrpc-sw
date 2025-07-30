@@ -74,6 +74,7 @@ struct sweep_state {
 struct rx_state {
     enum rx_fsm_state state;
     timeout_t timeout;
+    unsigned reset_iter;
     struct sweep_state sweep;
 };
 
@@ -210,7 +211,7 @@ int phy_calibration_poll(void)
 	    phy_dbg("reset rx\n");
 	    regs->reset |= RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
 	    regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
-	    tmo_init(&rx_state.timeout, 200);
+	    tmo_init(&rx_state.timeout, 200 + rx_state.reset_iter++);
 	    rx_state.state = RX_WAIT_RESET;
 	}
 	softpll.mpll.rxpi_ready = 0;
@@ -239,6 +240,7 @@ int phy_calibration_poll(void)
 		rx_state.state = RX_WAIT_FREQ_LOCK;
 		softpll.mpll.rxpi_ready = 0;
 		regs->ctrl = RXPI_GTHE4_MAP_CTRL_RDY;
+		rx_state.reset_iter = 0;
 	    }
 	}
 	break;
@@ -291,6 +293,7 @@ int phy_calibration_poll(void)
 
 void phy_calibration_init(void)
 {
+    rx_state.reset_iter = 0;
     rx_state.state = RX_RESET;
 }
 
