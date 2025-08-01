@@ -253,6 +253,8 @@ int phy_calibration_poll(void)
 	}
 	if (softpll.mpll.phase_ld.locked) {
 	    phy_dbg("phase locked, start sweep!\n");
+	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
+		       SPLL_DBG_EVT_SWEEP_START, 1);
 	    rxpi_sweep_init(&rx_state.sweep);
 	    rx_state.state = RX_SWEEP_WAIT;
 	}
@@ -261,6 +263,8 @@ int phy_calibration_poll(void)
     case RX_SWEEP_WAIT:
 	rxpi_sweep_fsm(&rx_state.sweep);
 	if (rx_state.sweep.state == SWEEP_DONE) {
+	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
+		       SPLL_DBG_EVT_SWEEP_DONE, 1);
 	    softpll.mpll.phase_shift_current = rx_state.sweep.abs_phase;
 	    softpll.mpll.phase_shift_target = 0;
 	    softpll.ptrackers[0].offset = -rx_state.sweep.delta;

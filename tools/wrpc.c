@@ -2043,6 +2043,8 @@ static const char *dbg_signal_to_string(int src)
 		return "phase_target";
 	case SPLL_DBG_SIGNAL_SRC:
 		return "source";
+	case SPLL_DBG_SIGNAL_EVENT:
+		return "event";
 	default:
 		return "<unknown?>";
 	}
@@ -2114,8 +2116,7 @@ void spll_dump_debug_data(const uint32_t *buf, size_t size)
 			printf("event=%s ", dbg_event_to_string(value));
 		}
 
-		printf("%s=%d ", dbg_signal_to_string(sig),
-			   value);
+		printf("%s=%d ", dbg_signal_to_string(sig), value);
 
 		if (SPLL_DBG_IS_LAST_RECORD(x))
 		{

@@ -153,6 +153,9 @@ static int rxts_calibration_update(uint32_t *t24p_value)
 	lookup_transition(&det_falling, flip, cal_cur_phase, 0);
 
 	if (cal_cur_phase >= CAL_SCAN_RANGE) {
+		spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
+			   SPLL_DBG_EVT_T24P_DONE, 1);
+
 		if (det_rising.state != TD_DONE || det_falling.state != TD_DONE)
 		{
 			pp_printf("RXTS calibration error.\n");
