@@ -544,12 +544,13 @@ void spll_show_stats(void)
 		/* Needs 2 pp_printf to avoid buffer overflow on printf
 		   buffer. */
 	  pp_printf("irqs:%d "
-		    "alignment_state:%d HL%d ML%d HY=%d MY=%d DelCnt=%d setpoint:%d refcnt:%d tagcnt:%d h_kp:%d h_ki:%d h_shift:%d ",
-		    s->irq_count, s->ext.align_state,
+		    "HL%d ML%d HY=%d MY=%d DelCnt=%d setpoint:%d pstarget:%d h_kp:%d h_ki:%d h_shift:%d ",
+		    s->irq_count,
 		    s->helper.ld.locked, s->mpll.locked,
 		    s->helper.pi.y, s->mpll.pi.y,
-		    s->delock_count, s->mpll.phase_shift_current,
-		    s->ref_count, s->tag_count,
+		    s->delock_count,
+		    s->mpll.phase_shift_current,
+		    s->mpll.phase_shift_target,
 		    s->helper.pi.kp,
 		    s->helper.pi.ki,
 		    s->helper.pi.shift);

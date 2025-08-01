@@ -148,6 +148,8 @@ static int rxts_calibration_update(uint32_t *t24p_value)
 	   ahead of rising edge counter */
 	int flip = ep_timestamper_cal_pulse(&wrc_endpoint_dev);
 
+	phy_dbg("RXTS calib:%dps flip:%d\n", cal_cur_phase, flip);
+
 	/* look for transitions (with deglitching) */
 	lookup_transition(&det_rising, flip, cal_cur_phase, 1);
 	lookup_transition(&det_falling, flip, cal_cur_phase, 0);
@@ -193,8 +195,6 @@ static int rxts_calibration_update(uint32_t *t24p_value)
 	cal_cur_phase += CAL_SCAN_STEP;
 
 	spll_set_phase_shift(0, cal_cur_phase);
-
-	phy_dbg("RXTS calib: %dps\n", cal_cur_phase);
 
 	return 0;
 }
