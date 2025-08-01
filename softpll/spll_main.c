@@ -123,7 +123,7 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 
 	s->freq_prelock_gain_boost = MPLL_FREQ_PRELOCK_GAIN_BOOST;
 
-	s->phase_ld.threshold = 1200;
+	s->phase_ld.threshold = 1200; // 5 * (1 << 14) / 200;
 	s->phase_ld.lock_samples = 1000;
 	s->phase_ld.delock_samples = 100;
 
@@ -305,13 +305,16 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_EVENT, 
 			   SPLL_DBG_EVT_FREQ_LOCK, 1);
 
+		/* Stabilize at the current phase, so start with err = 0 */
 		s->adder_ref = -tag;
 	}
 
 	if( !s->freq_ld.locked )
 		err = -s->freq_prelock_gain_boost * freq_error;
-	else
+	else {
 		err = s->adder_ref + tag;
+		err = (err << 10) >> 10;
+	}
 
 #if 0 //ndef WITH_SEQUENCING
 
@@ -354,7 +357,10 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (s->locked
 	    && !s->ps_freeze
 	    && s->phase_shift_current != s->phase_shift_target) {
-	        const int maxdelta = (1 << 14) / 20; /* 10ps */
+		/* Note: if maxdelta is too low, t24p calibration takes too
+		   much time and ptp times out.
+		   If maxdelta is too high, the spll can unlock. */
+	        const int maxdelta = (1 << 14) / 100; /* =2ps */
 		int delta = s->phase_shift_current - s->phase_shift_target;
 		if (delta > maxdelta)
 			delta = maxdelta;
@@ -366,6 +372,8 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 			s->adder_ref -= delta;
 		else
 			s->adder_ref += delta;
+
+		s->adder_ref = (s->adder_ref << 10) >> 10;
 	}
 
 	if(s->freq_ld.locked)
