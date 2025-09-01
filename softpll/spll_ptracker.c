@@ -43,6 +43,7 @@ void ptracker_start(struct spll_ptracker_state *s)
 #undef HPLL_N
 #define HPLL_N 22
 
+/* The phase of a ref_clk period (16ns) ~= 1_310_720 */
 #define PHASE_MAX ((16000 / 200) << 14)
 
 void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
@@ -95,15 +96,18 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 
 		if (s->avg_count == s->n_avg) {
 			int phase = (s->acc / s->n_avg) + s->offset;
-			if (phase > PHASE_MAX) {
+#if 1
+			/* Keep the phase within 1 ref_clk period, as it is
+			   used as fine grain offset for RX timestamp */
+			while (phase > PHASE_MAX) {
 				phase -= PHASE_MAX;
 				s->offset -= PHASE_MAX;
 			}
-			else if (phase < 0) {
+			while (phase < 0) {
 				phase += PHASE_MAX;
 				s->offset += PHASE_MAX;
 			}
-			else
+#endif
 				s->ready = 1;
 			s->phase_val = phase;
 			s->acc = 0;
