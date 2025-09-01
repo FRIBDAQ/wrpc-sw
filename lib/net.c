@@ -96,70 +96,52 @@ int ptpd_netif_close_socket(struct wrpc_socket *s)
  * Have a look at the note at http://ohwr.org/documents/xxx for details.
  */
 static void ptpd_netif_linearize_rx_timestamp(struct wr_timestamp *ts,
-					      int32_t dmtd_phase,
 					      int cntr_ahead,
 					      int transition_point,
 					      int clock_period)
 {
-	int nsec_f, nsec_r;
-
-	ts->raw_phase =  dmtd_phase;
-
 /* The idea is simple: the asynchronous RX timestamp trigger is tagged
  * by two counters: one counting at the rising clock edge, and the
  * other on the falling. That means, the rising timestamp is 180
  * degree in advance wrs to the falling one.
  */
 
-/* Calculate the nanoseconds value for both timestamps. The rising edge one
-   is just the HW register */
-	nsec_r = ts->nsec;
-/* The falling edge TS is the rising - 1 tick
-    if the "rising counter ahead" bit is set. */
-	nsec_f = cntr_ahead ? ts->nsec - (clock_period / 1000) : ts->nsec;
-
-/* Adjust the rising edge timestamp phase so that it "jumps" roughly
-   around the point where the counter value changes */
-	int phase_r = ts->raw_phase - transition_point;
-	if(phase_r < 0) /* unwrap negative value */
-		phase_r += clock_period;
-
-/* Do the same with the phase for the falling edge, but additionally shift
-   it by extra 180 degrees (so that it matches the falling edge counter) */
-	int phase_f = ts->raw_phase - transition_point + (clock_period / 2);
-	if(phase_f < 0)
-		phase_f += clock_period;
-	if(phase_f >= clock_period)
-		phase_f -= clock_period;
-
 /* If we are within +- 25% from the transition in the rising edge counter,
    pick the falling one */
-	if( phase_r > 3 * clock_period / 4 || phase_r < clock_period / 4 ) {
-		ts->nsec = nsec_f;
-
-		/* The falling edge timestamp is half a cycle later
-		   with respect to the rising one. Add
-		   the extra delay, as rising edge is our reference */
-		ts->phase = phase_f + clock_period / 2;
-		if(ts->phase >= clock_period) /* Handle overflow */
-		{
-			ts->phase -= clock_period;
-			ts->nsec += (clock_period / 1000);
+	if( ts->raw_phase > 3 * clock_period / 4) {
+		/* The falling edge is stable and we need to use its value.
+		   It is nsec_r - 1 if cntr_ahead */
+		if (cntr_ahead) {
+			ts->nsec -= (clock_period / 1000);
+			if (ts->nsec < 0) {
+				ts->nsec += 1000000000;
+				ts->sec--;
+			}
 		}
-	} else { /* We are closer to the falling edge counter transition?
-		    Pick the opposite timestamp */
-		ts->nsec = nsec_r;
-		ts->phase = phase_r;
+	}
+	else if (ts->raw_phase < clock_period / 4 ) {
+		/* The falling edge is stable, but we need to use nsec_f + 1
+		   If is nsec_r is cntr ahead */
+		if (!cntr_ahead) {
+			ts->nsec += (clock_period / 1000);
+			if (ts->nsec >= 1000000000) {
+				ts->nsec -= 1000000000;
+				ts->sec++;
+			}
+		}
+	}
+	else {
+		/* The rising edge is stable and use it
+		   Nothing extra.  */
 	}
 
-	/* In an unlikely case, after all the calculations,
-	   the ns counter may be overflown. */
-	if(ts->nsec >= 1000000000)
-	{
-		ts->nsec -= 1000000000;
-		ts->sec++;
-	}
+	ts->phase = ts->raw_phase;
 
+#if 0
+	pp_printf("rx ts: %us %06uns ph:%u rph:%u t24p:%u\n",
+		  (unsigned)ts->sec, ts->nsec, ts->phase,
+		  ts->raw_phase, transition_point);
+#endif
 }
 
 /* Slow, but we don't care much... */
@@ -241,7 +223,6 @@ int ptpd_netif_recvfrom(struct wrpc_socket *s, struct wr_sockaddr *from, void *d
 		rx_timestamp->correct = hwts.valid && (!spll_busy);
 
 		ptpd_netif_linearize_rx_timestamp(rx_timestamp,
-						  rx_timestamp->raw_phase,
 						  hwts.ahead,
 						  s->nif->phase_transition,
 						  REF_CLOCK_PERIOD_PS);
