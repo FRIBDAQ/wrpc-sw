@@ -126,7 +126,7 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	    /* Phase shift clock vco is running at 1250Mhz, so the
 	       period is 800ps.
 	       A shift is 800ps/56 */
-	    phy_dbg("phase result ph0:%u.%02u ph1:%u.%02u ph:%u.%02u phps:%ups\n",
+	    phy_dbg("sweep-result ph0:%u.%02u ph1:%u.%02u ph:%u.%02u phps:%ups\n",
 		    state->phase_0 / 56, state->phase_0 % 56,
 		    phase_1 / 56, phase_1 % 56,
 		    phase / 56, phase % 56,
@@ -169,11 +169,11 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	    int delta = tag_ref - abs_phase;
 
 	    /* Tag is (200ps/128) * (1<<15) * 256 = 200ps * (1<<14) */
-	    phy_dbg("rising edge, tag:%u tagui:%uui.%04x abs_ph:%u phui:%uui.%04x phps:%ups delta:%d deltaui:%dui.%04x (ui=200ps)\n",
+	    phy_dbg("rising edge, tag:%u tagui:%uui.%04x abs_ph:%u aphui:%uui.%04x aphps:%ups delta:%d deltaui:%d (ui=200ps)\n",
 		    tag_ref, tag_ref >> 14, (tag_ref << 2) & 0xffff,
 		    abs_phase, abs_phase >> 14, (abs_phase << 2) & 0xffff,
 		    abs_phase * 25 >> 11,
-		    delta, delta >> 14, (delta << 2) & 0xffff);
+		    delta, delta >> 14);
 
 	    state->abs_phase = abs_phase;
 	    state->delta = delta;
@@ -265,10 +265,14 @@ int phy_calibration_poll(void)
 	if (rx_state.sweep.state == SWEEP_DONE) {
 	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
 		       SPLL_DBG_EVT_SWEEP_DONE, 1);
+	    softpll.mpll.enabled = 0;
 	    softpll.mpll.phase_shift_current = rx_state.sweep.abs_phase;
 	    softpll.mpll.phase_shift_target = 0;
+	    pp_printf("rxpi: set ptrackers[0] offset: 0x%x\n",
+		      rx_state.sweep.delta);
 	    softpll.ptrackers[0].offset = -rx_state.sweep.delta;
 	    softpll.mpll.rxpi_ready = 1;
+	    softpll.mpll.enabled = 1;
 	    rx_state.state = RX_READY;
 	}
 	else if (rx_state.sweep.state == SWEEP_ERROR) {
