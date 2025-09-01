@@ -15,6 +15,8 @@ int pp_vprintf(const char *fmt, va_list args)
 
 	ret = pp_vsprintf(print_buf, fmt, args);
 	puts(print_buf);
+	if (ret > sizeof(print_buf))
+		puts("PRINTF OVF\n");
 	return ret;
 }
 
@@ -38,6 +40,7 @@ int pp_printf(const char *fmt, ...)
 	va_start(args, fmt);
 	ret = pp_vprintf(fmt, args);
 	va_end(args);
-
+	if (ret > sizeof(print_buf))
+		puts("PRINTF OVF\n");
 	return ret;
 }
