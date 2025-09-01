@@ -25,7 +25,7 @@ void spi_flash_create(struct spi_flash_device *dev, struct spi_bus *bus, uint32_
 	dev->cfg_entry = cfg_entry;
 	dev->use_4byte_addr = 0;
 
-	for(i=0;i < 10; i++)
+	for(i=0;i < 2; i++)
 		(void) spi_flash_rsr( dev ); // make sure SPI bus is in known state
 
 	uint32_t id = spi_flash_read_id( dev );
@@ -104,6 +104,7 @@ int spi_flash_read(struct spi_flash_device *dev, uint32_t addr, uint8_t *buf, in
 
 	for (i = 0; i < count; i++) {
 		buf[i] = bb_spi_read(dev->bus, 8);
+		//pp_printf("spi read(%04x): %02x\n", addr + i, buf[i]);
 	}
 	bb_spi_cs( dev->bus, 0 );
 
