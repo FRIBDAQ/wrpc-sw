@@ -95,19 +95,41 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 		s->avg_count ++;
 
 		if (s->avg_count == s->n_avg) {
-			int phase = (s->acc / s->n_avg) + s->offset;
-#if 1
+			int avg = s->acc / s->n_avg;
+			int phase = avg + s->offset;
 			/* Keep the phase within 1 ref_clk period, as it is
 			   used as fine grain offset for RX timestamp */
-			while (phase > PHASE_MAX) {
-				phase -= PHASE_MAX;
-				s->offset -= PHASE_MAX;
+			if (phase >= PHASE_MAX) {
+				/* Two possibilities */
+				if (s->offset > -PHASE_MAX
+				    && avg >= (1 << HPLL_N) - PHASE_MAX) {
+					/* The phase rollover to the max */
+					phase -= (1 << HPLL_N);
+					s->offset -= (1 << HPLL_N);
+				}
+				else {
+					/* The phase slowly increase and become
+					   greather than PHASE_MAX */
+					phase -= PHASE_MAX;
+					s->offset -= PHASE_MAX;
+				}
 			}
-			while (phase < 0) {
-				phase += PHASE_MAX;
-				s->offset += PHASE_MAX;
+			else if (phase < 0) {
+				/* Again, two possibilities */
+				if (s->offset < -(1 << HPLL_N) + PHASE_MAX
+				    && avg < PHASE_MAX) {
+					/* The phase rollover to the min */
+					phase += (1 << HPLL_N);
+					s->offset += (1 << HPLL_N);
+				}
+				else {
+					/* The phase slowly decreased and
+					   became < 0 */
+					phase += PHASE_MAX;
+					s->offset += PHASE_MAX;
+				}
 			}
-#endif
+			else
 				s->ready = 1;
 			s->phase_val = phase;
 			s->acc = 0;
