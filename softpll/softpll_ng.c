@@ -525,9 +525,9 @@ void ptracker_show_stats(void)
 			(struct spll_ptracker_state *)&softpll.ptrackers[ch];
 		int32_t phase;
 		spll_read_ptracker(ch, &phase, NULL);
-		pp_printf("ptrack %d: en %d id %d ready %d ",
+		pp_printf("ptrack%d: en:%d id:%d ready:%d ",
 			  ch, s->enabled, s->id, s->ready);
-		pp_printf("phase %d (%d ps) avg %d (offset:%d/0x%x)\n",
+		pp_printf("phase:%d phps:%dps avg:%d offset:%d offx:0x%x\n",
 			  s->phase_val, (int)phase, s->n_avg,
 			  s->offset, s->offset);
 	}
@@ -537,7 +537,7 @@ void spll_show_stats(void)
 {
 	struct softpll_state *s = (struct softpll_state *)&softpll;
 
-	pp_printf("softpll: mode:%s seq:%s n_ref %d n_out %d\n",
+	pp_printf("softpll: mode:%s seq:%s n_ref:%d n_out:%d\n",
 		  modes_name[s->mode], seq_states[s->seq_state],
 		  spll_n_chan_ref, spll_n_chan_out);
 
