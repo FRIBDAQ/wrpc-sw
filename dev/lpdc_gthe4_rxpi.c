@@ -271,6 +271,9 @@ int phy_calibration_poll(void)
 	    pp_printf("rxpi: set ptrackers[0] offset: 0x%x\n",
 		      rx_state.sweep.delta);
 	    softpll.ptrackers[0].offset = -rx_state.sweep.delta;
+	    softpll.ptrackers[0].preserve_sign = 1 << 2;
+	    softpll.ptrackers[0].sign_offset = 0;
+
 	    softpll.mpll.rxpi_ready = 1;
 	    softpll.mpll.enabled = 1;
 	    rx_state.state = RX_READY;

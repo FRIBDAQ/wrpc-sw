@@ -27,6 +27,7 @@ struct spll_ptracker_state {
 	/* Result (phase in dmtd unit) */
 	int phase_val;
 	int offset;
+	int sign_offset;
 };
 
 void ptracker_init(struct spll_ptracker_state *s, int id, int num_avgs);

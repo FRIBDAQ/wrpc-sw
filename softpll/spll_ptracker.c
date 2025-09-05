@@ -30,16 +30,18 @@ void ptracker_init(struct spll_ptracker_state *s, int id, int num_avgs)
 
 void ptracker_start(struct spll_ptracker_state *s)
 {
-	s->preserve_sign = 0;
+	s->preserve_sign = 1 << 2;
 	s->enabled = 1;
 	s->ready = 0;
 	s->acc = 0;
 	s->avg_count = 0;
+	s->sign_offset = 0;
 
 	spll_enable_tagger(s->id, 1);
 	spll_enable_tagger(MAIN_CHANNEL, 1);
 }
 
+/* Number of tag bits ~= 51_200 ps ~= 4_194_304 */
 #undef HPLL_N
 #define HPLL_N 22
 
@@ -77,63 +79,46 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 
 	register int index = delta >> (HPLL_N - 2);
 
-	if( s->dbg_channel >= 0 )
+	/* hack: two since PTRACK_WRAP_LO/HI are in 1/4 and 3/4 of the scale,
+	   we can use the two MSBs of delta and a trivial LUT instead,
+	   removing 2 branches */
+	s->sign_offset += adj_tab[index + s->preserve_sign];
+	s->preserve_sign = index << 2;
+	
+	if(spll_debug_en)
 	{
-		spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_ERR, tag_ref-tag, 1);
+		spll_debug( SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_TAG, delta, 0);
+		spll_debug( SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_ERR,
+			    s->sign_offset >> HPLL_N, 1);
 	}
 
-	if (s->avg_count == 0) {
-		/* hack: two since PTRACK_WRAP_LO/HI are in 1/4 and 3/4 of the scale,
-		   we can use the two MSBs of delta and a trivial LUT instead, removing 2 branches */
-		s->preserve_sign = index << 2;
-		s->acc = delta;
-		s->avg_count ++;
-	} else {
+	s->acc += delta + s->sign_offset;
+	s->avg_count ++;
 
-		/* same hack again, using another lookup table to adjust for wraparound */
-		s->acc += delta + adj_tab[ index + s->preserve_sign ];
-		s->avg_count ++;
+	if (s->avg_count == s->n_avg) {
+		int avg = s->acc / (int)s->n_avg;
+		int phase = avg + s->offset;
+		/* Keep the phase within 1 ref_clk period, as it is
+		   used as fine grain offset for RX timestamp */
+		if (phase >= PHASE_MAX) {
+			phase -= PHASE_MAX;
+			s->offset -= PHASE_MAX;
+		}
+		else if (phase < 0) {
+			phase += PHASE_MAX;
+			s->offset += PHASE_MAX;
+		}
+		else
+			s->ready = 1;
+		s->phase_val = phase;
+		s->acc = 0;
+		s->avg_count = 0;
 
-		if (s->avg_count == s->n_avg) {
-			int avg = s->acc / s->n_avg;
-			int phase = avg + s->offset;
-			/* Keep the phase within 1 ref_clk period, as it is
-			   used as fine grain offset for RX timestamp */
-			if (phase >= PHASE_MAX) {
-				/* Two possibilities */
-				if (s->offset > -PHASE_MAX
-				    && avg >= (1 << HPLL_N) - PHASE_MAX) {
-					/* The phase rollover to the max */
-					phase -= (1 << HPLL_N);
-					s->offset -= (1 << HPLL_N);
-				}
-				else {
-					/* The phase slowly increase and become
-					   greather than PHASE_MAX */
-					phase -= PHASE_MAX;
-					s->offset -= PHASE_MAX;
-				}
-			}
-			else if (phase < 0) {
-				/* Again, two possibilities */
-				if (s->offset < -(1 << HPLL_N) + PHASE_MAX
-				    && avg < PHASE_MAX) {
-					/* The phase rollover to the min */
-					phase += (1 << HPLL_N);
-					s->offset += (1 << HPLL_N);
-				}
-				else {
-					/* The phase slowly decreased and
-					   became < 0 */
-					phase += PHASE_MAX;
-					s->offset += PHASE_MAX;
-				}
-			}
-			else
-				s->ready = 1;
-			s->phase_val = phase;
-			s->acc = 0;
-			s->avg_count = 0;
+		if(spll_debug_en && s->dbg_channel >= 0 ) {
+			spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_Y, phase, 0);
+			spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_TAG, avg, 0);
+			spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_TAG, ((unsigned)avg) >> 16, 0);
+			spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_ERR, s->offset >> 14, 1);
 		}
 	}
 }
