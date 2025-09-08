@@ -92,6 +92,7 @@ static int get_port(uint8_t *buf, struct snmp_oid *obj);
 static int get_temp(uint8_t *buf, struct snmp_oid *obj);
 static int get_sfp_pn_curr(uint8_t *buf, struct snmp_oid *obj);
 static int get_sfp(uint8_t *buf, struct snmp_oid *obj);
+static int get_sfp_dom(uint8_t *buf, struct snmp_oid *obj);
 static int get_mac(uint8_t *buf, struct snmp_oid *obj);
 static int get_aux_diag(uint8_t *buf, struct snmp_oid *obj);
 static int set_value(uint8_t *set_buff, struct snmp_oid *obj, void *p);
@@ -189,6 +190,13 @@ static const uint8_t oid_wrpcPortSfpPn[] =             {2,0};
 static const uint8_t oid_wrpcPortSfpInDB[] =           {3,0};
 static const uint8_t oid_wrpcPortInternalTX[] =        {4,0};
 static const uint8_t oid_wrpcPortInternalRX[] =        {5,0};
+#ifdef CONFIG_SFP_DOM
+static const uint8_t oid_wrpcPortSfpTemp[] =           {6,0};
+static const uint8_t oid_wrpcPortSfpVoltage[] =        {7,0};
+static const uint8_t oid_wrpcPortSfpTxBias[] =         {8,0};
+static const uint8_t oid_wrpcPortSfpTxPower[] =        {9,0};
+static const uint8_t oid_wrpcPortSfpRxPower[] =        {10,0};
+#endif
 
 /* oid_wrpcSfpTable */
 static const uint8_t oid_wrpcSfpPn[] =                 {2};
@@ -301,7 +309,13 @@ static const struct snmp_oid oid_array_wrpcPortGroup[] = {
 	OID_FIELD_VAR(   oid_wrpcPortSfpInDB,        get_p,        NO_SET,   ASN_INTEGER,   &sfp_info.sfp_in_db),
 	OID_FIELD_VAR(   oid_wrpcPortInternalTX,     get_p,        NO_SET,   ASN_COUNTER,   &minic.tx_count),
 	OID_FIELD_VAR(   oid_wrpcPortInternalRX,     get_p,        NO_SET,   ASN_COUNTER,   &minic.rx_count),
-
+#ifdef CONFIG_SFP_DOM
+	OID_FIELD_VAR(   oid_wrpcPortSfpTemp,        get_sfp_dom,  NO_SET,   ASN_INTEGER,   SFP_DOM_TEMP),
+	OID_FIELD_VAR(   oid_wrpcPortSfpVoltage,     get_sfp_dom,  NO_SET,   ASN_INTEGER,   SFP_DOM_VCC),
+	OID_FIELD_VAR(   oid_wrpcPortSfpTxBias,      get_sfp_dom,  NO_SET,   ASN_INTEGER,   SFP_DOM_TX_BIAS_CURR),
+	OID_FIELD_VAR(   oid_wrpcPortSfpTxPower,     get_sfp_dom,  NO_SET,   ASN_INTEGER,   SFP_DOM_TX_POW),
+	OID_FIELD_VAR(   oid_wrpcPortSfpRxPower,     get_sfp_dom,  NO_SET,   ASN_INTEGER,   SFP_DOM_RX_POW),
+#endif
 	{ 0, }
 };
 
@@ -1115,6 +1129,39 @@ static int get_sfp(uint8_t *buf, struct snmp_oid *obj)
 	return 0;
 }
 
+/* Get sfp's monitoring information */
+static int get_sfp_dom(uint8_t *buf, struct snmp_oid *obj)
+{
+	int32_t tmp_int32;
+	struct shw_sfp_dom *sfp_dom;
+	sfp_dom = sfp_info.sfp_dom;
+
+	switch ((int) obj->p) {
+	case (int)SFP_DOM_TEMP:
+		tmp_int32 = (sfp_dom->temp[0] << 8) + sfp_dom->temp[1];
+		tmp_int32 = (tmp_int32 * 100) / 256;
+		return get_value(buf, obj->asn, &tmp_int32);
+	case (int)SFP_DOM_VCC:
+		tmp_int32 = (sfp_dom->vcc[0] << 8) + sfp_dom->vcc[1];
+		return get_value(buf, obj->asn, &tmp_int32);
+	case (int)SFP_DOM_TX_BIAS_CURR:
+		tmp_int32 = (sfp_dom->tx_bias[0] << 8) + sfp_dom->tx_bias[1];
+		tmp_int32 = (tmp_int32 * 2);
+		return get_value(buf, obj->asn, &tmp_int32);
+	case (int)SFP_DOM_TX_POW:
+		tmp_int32 = (sfp_dom->tx_pow[0] << 8) + sfp_dom->tx_pow[1];
+		return get_value(buf, obj->asn, &tmp_int32);
+	case (int)SFP_DOM_RX_POW:
+		tmp_int32 = (sfp_dom->rx_pow[0] << 8) + sfp_dom->rx_pow[1];
+		return get_value(buf, obj->asn, &tmp_int32);
+	default:
+		break;
+	}
+
+	return -1;
+}
+
+
 /* Copy mac and add '\0' char at the end. So ASN_OCTET_STR can find the end */
 static int get_mac(uint8_t *buf, struct snmp_oid *obj)
 {
@@ -1725,6 +1772,7 @@ static int snmp_respond(uint8_t *buf)
 		(void) set_sdb;
 		(void) func_aux_diag;
 		(void) get_i32sat_pp;
+		(void) get_sfp_dom;
 		(void) oid_array_wrpcAuxRwTable;
 		(void) oid_array_wrpcAuxRoTable;
 		(void) oid_array_wrpcInitScriptConfigGroup;
