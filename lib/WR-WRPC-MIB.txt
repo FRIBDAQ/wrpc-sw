@@ -10,13 +10,25 @@ IMPORTS
         DisplayString, MacAddress                FROM SNMPv2-TC;
 
 wrWrpcMIB MODULE-IDENTITY
-    LAST-UPDATED "201607061700Z"
+    REVISION     "202509081700Z"
     ORGANIZATION "CERN"
     CONTACT-INFO "postal:   BE-CO-HT, CERN, Geneva
                   email:    ht-drivers@cern.ch
                  "
     DESCRIPTION  "White Rabbit WRPC internal details
                  "
+    REVISION     "202509081700Z"
+    DESCRIPTION
+        "Added textual-conventions:
+         - WrpcDisplayTenths
+         - WrpcDisplayHundredths
+        Added objects:
+         - wrpcPortSfpTempF
+         - wrpcPortSfpTxBias
+         - wrpcPortSfpVccF
+         - wrpcPortSfpTxPowerF
+         - wrpcPortSfpRxPowerF
+        "
 
     REVISION     "202107101700Z"
     DESCRIPTION
@@ -37,6 +49,24 @@ wrWrpcMIB MODULE-IDENTITY
     ::= { cern 101 }
 
 cern OBJECT IDENTIFIER ::= { enterprises 96 }
+
+--=====================================================================
+-- Textual Conventions
+--=====================================================================
+
+WrpcDisplayTenths ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d-1"
+    STATUS       current
+    DESCRIPTION
+        "Display tenths (0.1) of Integer32"
+    SYNTAX     Integer32
+
+WrpcDisplayHundredths ::= TEXTUAL-CONVENTION
+    DISPLAY-HINT "d-2"
+    STATUS       current
+    DESCRIPTION
+        "Display hundredths (0.01) of Integer32"
+    SYNTAX     Integer32
 
 -- Define typical mib nodes
 -- we'll prefix everything in this mib with wrpc
@@ -686,6 +716,56 @@ wrpcPortInternalRx             OBJECT-TYPE
     DESCRIPTION
             "Total RX packets on a port"
     ::= { wrpcPortGroup 5 }
+
+wrpcPortSfpTempF  OBJECT-TYPE
+    SYNTAX             WrpcDisplayHundredths
+    UNITS              "C"
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+            "Temperature in 0.01 C reported by SFP. According to SFF-8472, accuracy of
+            this value must be better than 3 degrees Celsius"
+    ::= { wrpcPortGroup 6 }
+
+wrpcPortSfpVccF   OBJECT-TYPE
+    SYNTAX             WrpcDisplayTenths
+    UNITS              "mV"
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+            "Internally measured transceiver supply voltage in 0.1 mV reported by SFP.
+            According to SFF-8472, accuracy of this value must be better than 3%"
+    ::= { wrpcPortGroup 7 }
+
+wrpcPortSfpTxBias OBJECT-TYPE
+    SYNTAX             Integer32
+    UNITS              "uA"
+    MAX-ACCESS         read-only
+    STATUS             current
+    DESCRIPTION
+            "Measured TX bias current in uA reported by SFP.
+            According to SFF-8472, accuracy of this value must be better than 10%"
+    ::= { wrpcPortGroup 8 }
+
+wrpcPortSfpTxPowerF OBJECT-TYPE
+    SYNTAX               WrpcDisplayTenths
+    UNITS                "uW"
+    MAX-ACCESS           read-only
+    STATUS               current
+    DESCRIPTION
+            "Measured TX output power in 0.1 uW reported by SFP.
+            According to SFF-8472, accuracy of this value must be better than 3dB%"
+    ::= { wrpcPortGroup 9 }
+
+wrpcPortSfpRxPowerF OBJECT-TYPE
+    SYNTAX               WrpcDisplayTenths
+    UNITS                "uW"
+    MAX-ACCESS           read-only
+    STATUS               current
+    DESCRIPTION
+            "Measured RX output power in 0.1 uW reported by SFP.
+            According to SFF-8472, accuracy of this value must be better than 3dB%"
+    ::= { wrpcPortGroup 10 }
 
 -- ****************************************************************************
 wrpcSfpTable                   OBJECT-TYPE

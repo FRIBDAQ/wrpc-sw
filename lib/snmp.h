@@ -98,6 +98,13 @@
 /* defines used by get_port function */
 #define PORT_LINK_STATUS (void *) 1
 
+/* defines used by get_sfp_dom function */
+#define SFP_DOM_TEMP          (void *) 1
+#define SFP_DOM_VCC           (void *) 2
+#define SFP_DOM_TX_BIAS_CURR  (void *) 3
+#define SFP_DOM_TX_POW        (void *) 4
+#define SFP_DOM_RX_POW        (void *) 5
+
 /* defines for wrpcPtpConfigRestart */
 #define restartPtp 1
 #define restartPtpSuccessful 100
