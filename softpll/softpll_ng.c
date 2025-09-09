@@ -40,6 +40,14 @@ static const char * const seq_states[] =
 };
 #define SEQ_STATES_NR  ARRAY_SIZE(seq_states)
 
+static const char * const modes_name[] =
+{
+	[SPLL_MODE_DISABLED] = "disabled",
+	[SPLL_MODE_GRAND_MASTER] = "grandmaster",
+	[SPLL_MODE_FREE_RUNNING_MASTER] = "freemaster",
+	[SPLL_MODE_SLAVE] = "slave"
+};
+
 volatile struct softpll_state softpll;
 
 static volatile int ptracker_mask = 0;
@@ -292,7 +300,6 @@ void spll_very_init(void)
 
 void spll_init(int mode, int slave_ref_channel, int flags)
 {
-	static const char * const modes[] = { "disabled", "grandmaster", "freemaster", "slave"  };
 	int dummy;
 	int i;
 
@@ -366,7 +373,8 @@ void spll_init(int mode, int slave_ref_channel, int flags)
 
 	pll_verbose
 	    ("softpll: mode %s, %d ref channels, %d out channels, ref: %d\n",
-	     modes[mode], spll_n_chan_ref, spll_n_chan_out, slave_ref_channel);
+	     modes_name[mode], spll_n_chan_ref, spll_n_chan_out,
+	     slave_ref_channel);
 
 	/* Purge tag buffer */
 	while (!(SPLL->TRR_CSR & SPLL_TRR_CSR_EMPTY))
@@ -550,18 +558,12 @@ void ptracker_show_stats(void)
 void spll_show_stats(void)
 {
 	struct softpll_state *s = (struct softpll_state *)&softpll;
-	const char *statename;
 
-	if (s->seq_state >= SEQ_STATES_NR)
-		statename = "<Unknown>";
-	else
-		statename = seq_states[s->seq_state];
-
-	pp_printf("softpll: mode:%d seq:%s n_ref %d n_out %d\n",
-		  s->mode, statename,
+	pp_printf("softpll: mode:%s seq:%s n_ref %d n_out %d\n",
+		  modes_name[s->mode], seq_states[s->seq_state],
 		  spll_n_chan_ref, spll_n_chan_out);
 
-	if (s->mode > 0)
+	if (s->mode != SPLL_MODE_DISABLED)
 	{
 		/* Needs 2 pp_printf to avoid buffer overflow on printf
 		   buffer. */
