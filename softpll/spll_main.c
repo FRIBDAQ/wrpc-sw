@@ -262,6 +262,8 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (source != s->id_ref)
 		return;
 
+	tag &= (1<<22) - 1;
+
 	/* NB: a tag unit is 200ps >> 14 */
 	/* Compute delta of RX clock (and sign extend) */
 	ref_dt = tag - s->tag_ref;
