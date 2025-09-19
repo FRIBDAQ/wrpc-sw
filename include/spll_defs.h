@@ -45,7 +45,7 @@ WARNING: These parameters must be in sync with the generics of the HDL instantia
 #define MAX_PTRACKERS	BOARD_MAX_PTRACKERS /* Depends on wrc/wrs */
 
 /* Number of samples in a single ptracker averaging bin */
-#define PTRACKER_AVERAGE_SAMPLES 512
+#define PTRACKER_AVERAGE_SAMPLES 256
 
 /* Maximum MPLL loop gain scheduler levels */
 #define SPLL_GAIN_SCHED_MAX 2
