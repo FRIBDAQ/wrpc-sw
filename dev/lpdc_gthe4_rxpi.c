@@ -42,8 +42,6 @@ enum rx_fsm_state {
     RX_WAIT_RESET,
     /* Out of reset, wait for commas */
     RX_WAIT_COMMA,
-    /* Comma detected, wait for alignment */
-    RX_WAIT_ALIGN,
     /* Comma detected and at correct alignment */
     RX_WAIT_FREQ_LOCK,
     RX_SWEEP_WAIT,
@@ -224,14 +222,7 @@ int phy_calibration_poll(void)
 	}
 	break;
     case RX_WAIT_COMMA:
-	if (status & (1 << 16)) {
-	    phy_dbg("comma detected: %08x\n", status);
-	    rx_state.state = RX_WAIT_ALIGN;
-	}
-	break;
-
-    case RX_WAIT_ALIGN:
-	if (status & (1 << 10)) {
+	if (status & RXPI_GTHE4_MAP_STATUS_PHY_READY) {
 	    unsigned bitslide = regs->bitslide;
 	    phy_dbg("comma-aligned:%08x slide:%u\n", status, bitslide);
 	    if (bitslide & 1)
@@ -246,7 +237,7 @@ int phy_calibration_poll(void)
 	break;
 
     case RX_WAIT_FREQ_LOCK:
-	if (!(status & (1 << 16))) {
+	if (!(status & RXPI_GTHE4_MAP_STATUS_PHY_READY)) {
 	    phy_dbg("not comma aligned: %08x\n", status);
 	    rx_state.state = RX_RESET;
 	    regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
@@ -283,7 +274,7 @@ int phy_calibration_poll(void)
 	}
 	break;
     case RX_READY:
-	if (!(status & (1 << 16))) {
+	if (!(status & RXPI_GTHE4_MAP_STATUS_PHY_READY)) {
 	    phy_dbg("link down\n");
 	    rx_state.state = RX_RESET;
 	}
