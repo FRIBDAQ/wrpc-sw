@@ -225,8 +225,10 @@ int phy_calibration_poll(void)
 	if (status & RXPI_GTHE4_MAP_STATUS_PHY_READY) {
 	    unsigned bitslide = regs->bitslide;
 	    phy_dbg("comma-aligned:%08x slide:%u\n", status, bitslide);
-	    if (bitslide & 1)
+	    if (bitslide & 1) {
+		/* Try again */
 		rx_state.state = RX_RESET;
+	    }
 	    else {
 		rx_state.state = RX_WAIT_FREQ_LOCK;
 		softpll.mpll.rxpi_ready = 0;
@@ -297,6 +299,8 @@ void phy_calibration_init(void)
 {
     rx_state.reset_iter = 0;
     rx_state.state = RX_RESET;
+    regs->rxpi_nsamp = 0x7fff;
+    regs->rxpi_shift = 0;
 }
 
 

@@ -1,7 +1,7 @@
 #ifndef __CHEBY__RXPI_GTHE4_MAP__H__
 #define __CHEBY__RXPI_GTHE4_MAP__H__
 
-#define RXPI_GTHE4_MAP_SIZE 36 /* 0x24 */
+#define RXPI_GTHE4_MAP_SIZE 44 /* 0x2c */
 
 /* magic number to check presence */
 #define RXPI_GTHE4_MAP_ID 0x0UL
@@ -33,6 +33,9 @@
 #define RXPI_GTHE4_MAP_RESET_GTH_RX_BUF_RST 0x80UL
 #define RXPI_GTHE4_MAP_RESET_GTH_RX_BUF_RST_MASK 0x80UL
 #define RXPI_GTHE4_MAP_RESET_GTH_RX_BUF_RST_SHIFT 7
+#define RXPI_GTHE4_MAP_RESET_RXPI_RST 0x10000UL
+#define RXPI_GTHE4_MAP_RESET_RXPI_RST_MASK 0x10000UL
+#define RXPI_GTHE4_MAP_RESET_RXPI_RST_SHIFT 16
 
 /* REG status */
 #define RXPI_GTHE4_MAP_STATUS 0x8UL
@@ -51,8 +54,14 @@
 /* Bitslide */
 #define RXPI_GTHE4_MAP_BITSLIDE 0x10UL
 
+/* REG rxpi_nsamp */
+#define RXPI_GTHE4_MAP_RXPI_NSAMP 0x14UL
+
+/* REG rxpi_shift */
+#define RXPI_GTHE4_MAP_RXPI_SHIFT 0x18UL
+
 /* Control for phase shift */
-#define RXPI_GTHE4_MAP_PS_CTRL 0x14UL
+#define RXPI_GTHE4_MAP_PS_CTRL 0x1cUL
 #define RXPI_GTHE4_MAP_PS_CTRL_RST 0x1UL
 #define RXPI_GTHE4_MAP_PS_CTRL_RST_MASK 0x1UL
 #define RXPI_GTHE4_MAP_PS_CTRL_RST_SHIFT 0
@@ -67,7 +76,7 @@
 #define RXPI_GTHE4_MAP_PS_CTRL_SHIFT_SHIFT 9
 
 /* Status for phase shift */
-#define RXPI_GTHE4_MAP_PS_STAT 0x18UL
+#define RXPI_GTHE4_MAP_PS_STAT 0x20UL
 #define RXPI_GTHE4_MAP_PS_STAT_PHASE_MASK 0xffffUL
 #define RXPI_GTHE4_MAP_PS_STAT_PHASE_SHIFT 0
 #define RXPI_GTHE4_MAP_PS_STAT_FB_STOPPED 0x10000UL
@@ -84,12 +93,12 @@
 #define RXPI_GTHE4_MAP_PS_STAT_PS_BUSY_SHIFT 19
 
 /* Number of sampling for ps */
-#define RXPI_GTHE4_MAP_PS_COUNT 0x1cUL
+#define RXPI_GTHE4_MAP_PS_COUNT 0x24UL
 #define RXPI_GTHE4_MAP_PS_COUNT_VAL_MASK 0xffffffUL
 #define RXPI_GTHE4_MAP_PS_COUNT_VAL_SHIFT 0
 
 /* Number of sampling for ps */
-#define RXPI_GTHE4_MAP_PS_RES 0x20UL
+#define RXPI_GTHE4_MAP_PS_RES 0x28UL
 #define RXPI_GTHE4_MAP_PS_RES_VAL_MASK 0xffffffUL
 #define RXPI_GTHE4_MAP_PS_RES_VAL_SHIFT 0
 #define RXPI_GTHE4_MAP_PS_RES_GEN_MASK 0xff000000UL
@@ -112,16 +121,22 @@ struct rxpi_gthe4_map {
   /* [0x10]: REG (ro) Bitslide */
   uint32_t bitslide;
 
-  /* [0x14]: REG (rw) Control for phase shift */
+  /* [0x14]: REG (rw) */
+  uint32_t rxpi_nsamp;
+
+  /* [0x18]: REG (rw) */
+  uint32_t rxpi_shift;
+
+  /* [0x1c]: REG (rw) Control for phase shift */
   uint32_t ps_ctrl;
 
-  /* [0x18]: REG (ro) Status for phase shift */
+  /* [0x20]: REG (ro) Status for phase shift */
   uint32_t ps_stat;
 
-  /* [0x1c]: REG (wo) Number of sampling for ps */
+  /* [0x24]: REG (wo) Number of sampling for ps */
   uint32_t ps_count;
 
-  /* [0x20]: REG (ro) Number of sampling for ps */
+  /* [0x28]: REG (ro) Number of sampling for ps */
   uint32_t ps_res;
 };
 #endif /* !__ASSEMBLER__*/
