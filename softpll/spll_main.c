@@ -67,7 +67,7 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 	s->pi.y_max = (1 << BOARD_SPLL_DAC_BITS) - (5 << BOARD_SPLL_DIV_BITS); // 3100 * 4;
 	s->pi.anti_windup = 1;
 	s->pi.bias = (1 << (BOARD_SPLL_DAC_BITS - 1)); // midscale
-	s->pi.shift = 22; // PI_FRACBITS - BOARD_SPLL_DIV_BITS;
+	s->pi.shift = 18; // PI_FRACBITS - BOARD_SPLL_DIV_BITS;
 #if defined(CONFIG_TARGET_WR_SWITCH)
 	static int init = 1;
 	if (init) { /* Avoid overwriting pi values when e.g change timing mode */

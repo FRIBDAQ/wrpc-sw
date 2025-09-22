@@ -300,7 +300,7 @@ void phy_calibration_init(void)
     rx_state.reset_iter = 0;
     rx_state.state = RX_RESET;
     regs->rxpi_nsamp = 0x7fff;
-    regs->rxpi_shift = 0;
+    regs->rxpi_shift = 8;
 }
 
 
