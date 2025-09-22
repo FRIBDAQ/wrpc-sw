@@ -67,7 +67,7 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 	s->pi.y_max = (1 << BOARD_SPLL_DAC_BITS) - (5 << BOARD_SPLL_DIV_BITS); // 3100 * 4;
 	s->pi.anti_windup = 1;
 	s->pi.bias = (1 << (BOARD_SPLL_DAC_BITS - 1)); // midscale
-	s->pi.shift = PI_FRACBITS - BOARD_SPLL_DIV_BITS;
+	s->pi.shift = 22; // PI_FRACBITS - BOARD_SPLL_DIV_BITS;
 #if defined(CONFIG_TARGET_WR_SWITCH)
 	static int init = 1;
 	if (init) { /* Avoid overwriting pi values when e.g change timing mode */
@@ -109,21 +109,21 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 	}
 	init = 0;
 #elif defined(CONFIG_WR_NODE)
-	s->pi.kp = -110; // -1100; //-50;		// / 2;
-	s->pi.ki = -3; // -30; // -1;			// / 2;
+	s->pi.kp = -1280; // -1100; //-50;		// / 2;
+	s->pi.ki = -30; // -30; // -1;			// / 2;
 #else
 #error "Please set CONFIG for wr switch or wr node"
 #endif
 	s->enabled = 0;
 
 	/* Frequency branch lock detection */
-	s->freq_ld.threshold = (1 << 14) / 128; /* ~1.5ps */
+	s->freq_ld.threshold = (1 << 14); /* ~1.5ps */
 	s->freq_ld.lock_samples = 50;
 	s->freq_ld.delock_samples = 20000;
 
 	s->freq_prelock_gain_boost = MPLL_FREQ_PRELOCK_GAIN_BOOST;
 
-	s->phase_ld.threshold = 1200; // 5 * (1 << 14) / 200;
+	s->phase_ld.threshold = 4 * (1 << 14); 
 	s->phase_ld.lock_samples = 1000;
 	s->phase_ld.delock_samples = 100;
 
@@ -262,12 +262,12 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (source != s->id_ref)
 		return;
 
-	tag &= (1<<22) - 1;
+	tag &= (1<<24) - 1;
 
 	/* NB: a tag unit is 200ps >> 14 */
 	/* Compute delta of RX clock (and sign extend) */
 	ref_dt = tag - s->tag_ref;
-	ref_dt = (ref_dt << 10) >> 10;
+	ref_dt = (ref_dt << 8) >> 8;
 	s->tag_ref = tag;
 
 	/* If there are both ref and out tags, ... */
@@ -311,11 +311,12 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 		s->adder_ref = -tag;
 	}
 
-	if( !s->freq_ld.locked )
+	if( !s->freq_ld.locked ) {
 		err = -s->freq_prelock_gain_boost * freq_error;
+	}
 	else {
 		err = s->adder_ref + tag;
-		err = (err << 10) >> 10;
+		err = (err << 8) >> 8;
 	}
 
 #if 0 //ndef WITH_SEQUENCING
