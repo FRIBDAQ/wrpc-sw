@@ -527,9 +527,9 @@ void ptracker_show_stats(void)
 		spll_read_ptracker(ch, &phase, NULL);
 		pp_printf("ptrack%d: en:%d id:%d ready:%d ",
 			  ch, s->enabled, s->id, s->ready);
-		pp_printf("phase:%d phps:%dps avg:%d offset:%d offx:0x%x\n",
+		pp_printf("phase:%d phps:%dps avg:%d offset:%d offx:0x%x soff:%d\n",
 			  s->phase_val, (int)phase, s->n_avg,
-			  s->offset, s->offset);
+			  s->offset, s->offset, s->sign_offset);
 	}
 }
 

@@ -136,7 +136,8 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	       Round the sweep phase. */
 	    unsigned sub_tag = tag_ref & ((1 << 14) - 1);
 
-	    /* Traces */
+	    /* Traces.
+	       Extract the remainder of 200ps for phase shift and tag */
 	    int ph_ps = (phase * 800 / 56) % 200;
 	    int tag_ps = ((tag_ref & ((1 << 14) - 1)) * 200) >> 14;
 	    phy_dbg("ph_ps:%d tag_ps:%d diff_ps:%d sub_tag:%04x\n",
@@ -300,7 +301,7 @@ void phy_calibration_init(void)
     rx_state.reset_iter = 0;
     rx_state.state = RX_RESET;
     regs->rxpi_nsamp = 0x7fff;
-    regs->rxpi_shift = 8;
+    regs->rxpi_shift = 0;
 }
 
 
