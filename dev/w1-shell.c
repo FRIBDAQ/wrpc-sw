@@ -9,6 +9,7 @@
 
 #define BLEN 32
 
+#ifdef CONFIG_CMD_W1_EEPROM
 /* A shell command, for testing write: "w1w <offset> <byte> [<byte> ...]" */
 int cmd_w1w(const char *args[])
 {
@@ -51,7 +52,9 @@ int cmd_w1r(const char *args[])
 	}
 	return i == blen ? 0 : -1;
 }
+#endif /* CONFIG_CMD_W1_EEPROM */
 
+#ifdef CONFIG_CMD_W1_TEMP
 /* A shell command, for checking */
 int cmd_w1(const char *args[])
 {
@@ -71,3 +74,4 @@ int cmd_w1(const char *args[])
 	}
 	return 0;
 }
+#endif /* CONFIG_CMD_W1_TEMP */

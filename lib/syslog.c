@@ -34,6 +34,7 @@ void syslog_init(void)
 	tics_zero = timer_get_tics();
 }
 
+#ifdef CONFIG_CMD_SYSLOG
 int cmd_syslog(const char *args[])
 {
 	char b1[32], b2[32];
@@ -67,6 +68,7 @@ int cmd_syslog(const char *args[])
 	tics = 0; /* send the first frame immediately to the new host */
 	return 0;
 }
+#endif /* CONFIG_CMD_SYSLOG */
 
 #define SYSLOG_DEFAULT_LEVEL 14 /* 8 == user + 6 ==info */
 static int syslog_header(char *buf, int level, unsigned char ip[4])

@@ -278,7 +278,7 @@ int latency_poll(void)
 }
 
 
-
+#ifdef CONFIG_CMD_LATENCY_PROBE
 int cmd_ltest(const char *args[])
 {
 	int v = 0, v1 = 0;
@@ -304,3 +304,4 @@ int cmd_ltest(const char *args[])
 		  lat_verbose ? "verbose" : "quiet");
 	return 0;
 }
+#endif /* CONFIG_CMD_LATENCY_PROBE */

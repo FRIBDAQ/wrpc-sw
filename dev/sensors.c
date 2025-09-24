@@ -18,30 +18,6 @@
 
 static struct wrc_sensor *sensors = NULL;
 
-static const char* sensor_type_string( uint8_t flags )
-{
-	if ( flags & WRC_SENSOR_TEMP_CELSIUS )
-		return "Temperature";
-	else if ( flags & WRC_SENSOR_VOLTAGE_MV )
-		return "Voltage";
-	else if ( flags & WRC_SENSOR_CURRENT_MA )
-		return "Current";
-	else
-		return "?";
-}
-
-static const char* sensor_unit_string( uint8_t flags )
-{
-	if ( flags & WRC_SENSOR_TEMP_CELSIUS )
-		return "degC";
-	else if ( flags & WRC_SENSOR_VOLTAGE_MV )
-		return "mV";
-	else if ( flags & WRC_SENSOR_CURRENT_MA )
-		return "mA";
-	else
-		return "";
-}
-
 void wrc_register_sensors( struct wrc_sensor* s)
 {
 	sensors = s;
@@ -93,6 +69,30 @@ struct wrc_sensor* wrc_sensor_find_by_type(uint8_t type)
 /*
  * The shell command
  */
+#ifdef CONFIG_CMD_TEMP_SENSORS
+static const char* sensor_type_string( uint8_t flags )
+{
+	if ( flags & WRC_SENSOR_TEMP_CELSIUS )
+		return "Temperature";
+	else if ( flags & WRC_SENSOR_VOLTAGE_MV )
+		return "Voltage";
+	else if ( flags & WRC_SENSOR_CURRENT_MA )
+		return "Current";
+	else
+		return "?";
+}
+
+static const char* sensor_unit_string( uint8_t flags )
+{
+	if ( flags & WRC_SENSOR_TEMP_CELSIUS )
+		return "degC";
+	else if ( flags & WRC_SENSOR_VOLTAGE_MV )
+		return "mV";
+	else if ( flags & WRC_SENSOR_CURRENT_MA )
+		return "mA";
+	else
+		return "";
+}
 
 int cmd_sensors(const char *args[])
 {
@@ -112,5 +112,6 @@ int cmd_sensors(const char *args[])
 
 	return 0;
 }
+#endif /* CONFIG_CMD_TEMP_SENSORS */
 
 #endif /* CONFIG_GENERIC_SENSORS */
