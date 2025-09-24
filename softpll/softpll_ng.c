@@ -295,7 +295,7 @@ void spll_very_init(void)
 
 
 	helper_very_init((struct spll_helper_state *) &softpll.helper); // set up default PI gains/lock thresholds
-	
+
 }
 
 void spll_init(int mode, int slave_ref_channel, int flags)
@@ -628,13 +628,7 @@ void spll_show_stats(void)
 	}
 
 #ifndef CONFIG_TARGET_WR_SWITCH
-	for (ch = 0; ch < spll_n_chan_ref; ch++)
-		{
-			pp_printf( "softpll: ptracker%d: enabled %d n_avg %d value %d\n", ch,
-			s->ptrackers[ch].enabled ? 1 : 0,
-			s->ptrackers[ch].n_avg,
-			s->ptrackers[ch].phase_val );
-		}
+	ptracker_show_stats();
 #endif
 
 }
@@ -790,7 +784,7 @@ int spll_update(void)
 	stats->main_pll_ki = softpll.mpll.pi.ki;
 	stats->helper_pll_kp = softpll.helper.pi.kp;
 	stats->helper_pll_ki = softpll.helper.pi.ki;
-	
+
 	stats->sequence++;
 #endif
 
