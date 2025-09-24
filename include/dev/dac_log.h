@@ -29,5 +29,6 @@
 void daclog_init(void);
 int daclog_poll(void);
 
+void spll_log_dac(int y);
 
 #endif

@@ -385,7 +385,7 @@ int mmc_link_poll_state(struct ertm14_mmc_link *link, struct ertm14_mmc_state *s
 
 //#define PROFILE_ULINK
 
-void bist_checkpoint( struct bist_stage *bist, int id, int channel, int pass )
+static void bist_checkpoint( struct bist_stage *bist, int id, int channel, int pass )
 {
     int i;
     for(i = 0; bist[i].name; i++ )
@@ -399,14 +399,14 @@ void bist_checkpoint( struct bist_stage *bist, int id, int channel, int pass )
         }
 }
 
-void bist_init( struct bist_stage *bist )
+static void bist_init( struct bist_stage *bist )
 {
     int i;
     for(i = 0; bist[i].name; i++ )
         bist[i].status = 0;
 }
 
-int bist_summary( struct bist_stage *bist )
+static int bist_summary( struct bist_stage *bist )
 {
     int i;
     int n_ok = 0, n_errors = 0;
@@ -455,8 +455,7 @@ int bist_summary( struct bist_stage *bist )
 
 static int ertm_init_complete = 0;
 
-void ertm14_set_pps_out_mode(int mode);
-void ertm15_force_rf_power_measurement(void);
+static void ertm15_force_rf_power_measurement(void);
 static void mmc_comm_init(void);
 
 #define LTC6950_ID_VALUE 0x65
@@ -815,7 +814,7 @@ static void ertm14_dds_sync_calibrate(void)
 }
     
         
-void blink(int id)
+static void blink(int id)
 {
     struct gpio_pin *pin = NULL;
 
@@ -1021,7 +1020,7 @@ static void streamers_set_rx_latency( uint32_t lat )
 }
 
 int streamers_get_rx_latency(void)
-    {
+{
     return streamers_readl( offsetof( struct WR_STREAMERS_WB, RX_CFG5 ) );
 }
 
@@ -1138,8 +1137,8 @@ static void set_board_config(struct ertm14_board_state *bs)
     board_state_to_no(&ertm14_next_state, 0);
 }
 
-void get_version_info(struct ertm14_version_info *bi)
-    {
+static void get_version_info(struct ertm14_version_info *bi)
+{
 	memcpy(&bi->ertm14_serial, &ertm14_board_info.board_serial_number,
 			     sizeof(ertm14_board_info.board_serial_number));
 	memcpy(&bi->ertm15_serial, &ertm15_board_info.board_serial_number,
@@ -1165,7 +1164,7 @@ void get_version_info(struct ertm14_version_info *bi)
     bi->calibration_date = cd;
     }
 
-void get_fpga_info(uint8_t *bi)
+static void get_fpga_info(uint8_t *bi)
 {
 	int i;
 	uint32_t *info = (uint32_t *)bi;
@@ -1822,7 +1821,7 @@ static void ertm15_init_leds(void)
 }
 
 // initializes the eRTM15 LTC6950 PLL & OCXO
-int ertm15_pll_init(void)
+static int ertm15_pll_init(void)
 {
     ltc695x_init(&board.ltc6950_pll, &board.spi_ltc6950);
 
@@ -1940,7 +1939,7 @@ static int clkab_enable_sync( struct ertm14_board_state *state, int clka_or_clkb
 }
 
 
-int ertm14_init_clkab_distribution(void)
+static int ertm14_init_clkab_distribution(void)
 {
     /* initialize the SPI bus for the CLKA fanout (LTC6953) */
     bb_spi_create( &board.spi_ltc6953_clka,
@@ -1988,7 +1987,7 @@ int ertm14_init_clkab_distribution(void)
     return 0;
 }
 
-int ertm14_init_ref_clock_distribution(void)
+static int ertm14_init_ref_clock_distribution(void)
 {
     int main_stat = ad951x_init(&board.ad9516_main, &board.spi_pll_main, &pin_pll_main_reset, &pin_pll_main_lock);
     int ext_stat = ad951x_init(&board.ad9516_ext, &board.spi_pll_ext, &pin_pll_ext_reset, &pin_pll_ext_lock);
@@ -2025,7 +2024,7 @@ int ertm14_init_ref_clock_distribution(void)
     return 0;
 }
 
-int ertm15_init_dds(void)
+static int ertm15_init_dds(void)
 {
 // reset both DDS chips
     gen_gpio_out(&pin_ad9910_ref_reset, 1);
@@ -2047,7 +2046,7 @@ int ertm15_init_dds(void)
     return 0;
 }
 
-int ertm14_init_mac_eeprom(void)
+static int ertm14_init_mac_eeprom(void)
 {
     bb_i2c_create( &board.i2c_mac_addr, &pin_mac_addr_scl, &pin_mac_addr_sda );
     bb_i2c_init( &board.i2c_mac_addr );
@@ -2080,7 +2079,7 @@ void ertm14_set_pps_out_mode(int mode)
     gen_gpio_out( &pin_pps_out_mode2, (mode & 0x4) ? 1 : 0);
 }
 
-int ertm14_low_level_init(void)
+static int ertm14_low_level_init(void)
 {
     ertm_init_complete = 0;
 
@@ -2416,7 +2415,7 @@ int ertm14_get_clkab_divider( int freq )
     return -1;
 }
 
-int ertm14_get_supported_clkab_freqs( int *freqs, int max_count )
+static int __attribute__((unused)) ertm14_get_supported_clkab_freqs( int *freqs, int max_count )
 {
     int i;
     for(i = 0;clkab_freqs[i].freq >= 0; i++)
@@ -2430,7 +2429,6 @@ int ertm14_get_supported_clkab_freqs( int *freqs, int max_count )
 
     return i;
 }
-
 
 #define ERTM14_EXPECTED_FLASH_ID 0x00016018
 
@@ -2549,7 +2547,7 @@ static void mmc_show_version_info( const char *brdname, struct ertm14_mmc_state 
     pp_printf("  - Serial Number    : %32s\n",   st->info.board_serial_number );
 }
 
-int mmc_link_init( struct ertm14_mmc_link *link, struct simple_uart_device *uart_dev, uint32_t uart_base, uint32_t uart_speed )
+static int mmc_link_init( struct ertm14_mmc_link *link, struct simple_uart_device *uart_dev, uint32_t uart_base, uint32_t uart_speed )
 {
     suart_init( uart_dev, uart_base, uart_speed ); // fixme: check errors
     uart_link_create_wrpc_suart( &link->ulink, uart_dev );
@@ -2614,7 +2612,7 @@ int mmc_link_poll_state(struct ertm14_mmc_link *link, struct ertm14_mmc_state *s
     return 0;
 }
 
-void poll_mmc_sensors(struct ertm14_mmc_link *link)
+static void poll_mmc_sensors(struct ertm14_mmc_link *link)
 {
     struct ertm14_mmc_state state;
 
@@ -2642,7 +2640,7 @@ void poll_mmc_sensors(struct ertm14_mmc_link *link)
     }
 }
 
-int mmc_test_communication( struct ertm14_mmc_link *link, struct ertm14_mmc_state *state, int attempts )
+static int mmc_test_communication( struct ertm14_mmc_link *link, struct ertm14_mmc_state *state, int attempts )
 {
     int i;
 
@@ -2736,12 +2734,12 @@ static void mmc_comm_init(void)
 
 static timeout_t rfmon_timeout;
 
-void ertm15_init_rf_monitor( void )
+static void ertm15_init_rf_monitor( void )
 {
     tmo_init( &rfmon_timeout, 2000 );
 }
 
-void ertm15_force_rf_power_measurement( void )
+static void ertm15_force_rf_power_measurement( void )
 {
         struct ertm14_board_state *bstate = ertm14_get_current_state();
 
@@ -2759,7 +2757,7 @@ void ertm15_force_rf_power_measurement( void )
     ertm15_rf_distr_measure_power_restart( &board.rf_distr, 1 );
 }
 
-int ertm15_update_rf_monitor( void )
+static int ertm15_update_rf_monitor( void )
 {
     if( ertm15_rf_distr_is_pwrmon_idle( &board.rf_distr ) )
     {
@@ -2810,7 +2808,7 @@ static int wrc_ptp_get_state(void)
 	return ppi->state;
 }
 
-int ertm14_update_leds( void )
+static int ertm14_update_leds( void )
 {
     /* White Rabbit Servo */
     enum {

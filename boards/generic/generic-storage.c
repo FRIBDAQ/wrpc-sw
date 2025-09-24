@@ -7,7 +7,7 @@
 #include "dev/i2c_eeprom.h"
 #include "dev/syscon.h"
 #include "storage.h"
-
+#include "generic-storage.h"
 
 void generic_board_i2c_storage(void)
 {

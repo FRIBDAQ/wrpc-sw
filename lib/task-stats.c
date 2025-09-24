@@ -20,6 +20,7 @@
 #include "dev/temperature.h"
 #include "wrc_global.h"
 #include "shell.h"
+#include "wrc.h"
 
 #ifdef CONFIG_CMD_MONITOR_SERVO_ERR
 #define HAS_MONITOR_SERVO_ERR 1

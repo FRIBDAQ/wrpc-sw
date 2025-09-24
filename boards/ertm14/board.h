@@ -202,4 +202,7 @@ void ertm14_sync_pulse_cal(void);
 
 void console_ertm14_init(void);
 
+int streamers_get_rx_latency(void);
+int streamers_get_rx_timeout(void);
+
 #endif /* __BOARD_WRC_H */

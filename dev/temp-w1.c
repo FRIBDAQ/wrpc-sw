@@ -7,9 +7,10 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
-#include <wrc.h>
-#include <dev/w1.h>
+#include "wrc.h"
+#include "dev/w1.h"
 #include "dev/temperature.h"
+#include "dev/temp-w1.h"
 
 static struct wrc_temp_sensor temp_w1_data[] = {
 	{"pcb", TEMP_INVALID},

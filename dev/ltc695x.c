@@ -60,7 +60,7 @@ int ltc695x_configure(struct ltc695x_device *dev, struct ltc695x_config* cfg)
     return 0;
 }
 
-int ltc6953_set_pdown( struct ltc695x_device *dev, int out, int pd )
+static int ltc6953_set_pdown( struct ltc695x_device *dev, int out, int pd )
 {
     int shift = (out & 0x3) * 2;
     int reg = 0x3 + (out / 4);

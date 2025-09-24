@@ -4,6 +4,7 @@
 #include "shell.h"
 #include "lib/ipv4.h"
 #include "dev/netif.h"
+#include "dev/dac_log.h"
 
 /* a tx-only socket: no queue is there */
 static DECLARE_WRPC_SOCKET(daclog_socket, 0);

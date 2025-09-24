@@ -96,9 +96,6 @@ uint32_t endian_flag; /* from dump_info[0], lazily */
 
 int print_labels = 1;
 
-void dump_mem_ppsi_wrpc(void *mapaddr, unsigned long ppg_off);
-void dump_one_field_ppsi_wrpc(int type, int size, void *p, int i);
-int dump_one_field_type_ppsi_wrpc(int type, int size, void *p);
 
 void print_str(char *s)
 {

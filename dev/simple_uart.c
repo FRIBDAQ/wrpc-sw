@@ -55,7 +55,7 @@ int suart_write_string(struct simple_uart_device *dev, const char *s)
 	return s - t;
 }
 
-int suart_get_rx_fifo_count( struct simple_uart_device *dev )
+static int suart_get_rx_fifo_count( struct simple_uart_device *dev )
 {
 	uint32_t r = readl( dev->base + UART_REG_SR );
 	int n = UART_SR_RX_FIFO_BYTES_R(r);
@@ -65,7 +65,6 @@ int suart_get_rx_fifo_count( struct simple_uart_device *dev )
 
 	return n;
 }
-
 
 int suart_poll(struct simple_uart_device *dev)
 {
@@ -85,20 +84,20 @@ int suart_read_byte(struct simple_uart_device *dev)
 	return readl(dev->base + UART_REG_RDR) & 0xff;
 }
 
-int suart_get_tx_fifo_count( struct simple_uart_device *dev )
+static int __attribute__((unused)) suart_get_tx_fifo_count( struct simple_uart_device *dev )
 {
 	// fixme
 	return -1;
 }
 
-int suart_purge_tx_fifo( struct simple_uart_device *dev )
+static int __attribute__((unused)) suart_purge_tx_fifo( struct simple_uart_device *dev )
 {
 	uint32_t r = readl( dev->base + UART_REG_CR );
 	writel((r | UART_CR_TX_FIFO_PURGE), dev->base + UART_REG_CR );
 	return 0;
 }
 
-int suart_purge_rx_fifo( struct simple_uart_device *dev )
+static int __attribute__((unused)) suart_purge_rx_fifo( struct simple_uart_device *dev )
 {
 	uint32_t r = readl( dev->base + UART_REG_CR );
 	writel((r | UART_CR_RX_FIFO_PURGE), dev->base + UART_REG_CR );

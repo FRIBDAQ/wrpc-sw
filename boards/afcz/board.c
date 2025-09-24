@@ -433,7 +433,6 @@ static void wr_si57x_interface_init( struct wr_si57x_interface_device *dev, uint
 }
 
 
-
 // fixme: factor out all this code to a common file (used by sis83k, afcz, ertm)
 static int calc_apr(int meas_min, int meas_max, int f_center )
 {
@@ -546,7 +545,7 @@ static void set_main_dac( int value )
 	spll_set_dac( 0, value );
 }
 
-int afcz_check_clocks(void)
+static int afcz_check_clocks(void)
 {
 	//check_vco_freq( AFCZ_CM_CHANNEL_CLK_DMTD, AFCZ_CM_CHANNEL_CLK_RX, set_dmtd_dac );
 	//check_vco_freq( AFCZ_CM_CHANNEL_CLK_REF,  AFCZ_CM_CHANNEL_CLK_RX, set_main_dac );
@@ -789,23 +788,24 @@ int wrc_board_early_init()
 	tca9548_select_channels( &board.si57x.master, 0x70, 1 << AFCZ_I2C_MUX_CHANNEL_SI570 );
 #endif
 
-#if 0
-	set_dmtd_dac(32767);
-	set_main_dac(30000);
 
-	ep_reset_phy(&wrc_endpoint_dev);
-	afcz_check_clocks();
+	/* Debug code */
+	if (0) {
+		set_dmtd_dac(32767);
+		set_main_dac(30000);
+
+		ep_reset_phy(&wrc_endpoint_dev);
+		afcz_check_clocks();
 
 // cross-check the REF and DDMTD clocks
 
-	wb_cm_configure( &board.clk_mon, AFCZ_CM_CHANNEL_CLK_DMTD, 5, 1000000 );
-	wb_cm_set_ref_frequency( &board.clk_mon, CPU_CLOCK );
-	wb_cm_restart( &board.clk_mon );
-	timer_delay_ms(4000);
-	wb_cm_read(  &board.clk_mon );
-	wb_cm_show(  &board.clk_mon );
-
-#endif
+		wb_cm_configure( &board.clk_mon, AFCZ_CM_CHANNEL_CLK_DMTD, 5, 1000000 );
+		wb_cm_set_ref_frequency( &board.clk_mon, CPU_CLOCK );
+		wb_cm_restart( &board.clk_mon );
+		timer_delay_ms(4000);
+		wb_cm_read(  &board.clk_mon );
+		wb_cm_show(  &board.clk_mon );
+	}
 
 	return 0;
 }

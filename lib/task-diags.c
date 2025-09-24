@@ -14,6 +14,7 @@
 #include "wrc-task.h"
 #include "ppsi/ppsi.h"
 #include "wrpc.h"
+#include "wrc.h"
 #include "dev/wdiags.h"
 #include "dev/temperature.h"
 #include "softpll/softpll_ng.h"

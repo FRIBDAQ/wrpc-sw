@@ -156,7 +156,10 @@ obj-$(CONFIG_ARCH_RISCV) += check-error.o
 # add system check functions like stack overflow and check reset
 obj-y += system_checks.o
 
-CFLAGS = $(cflags-y) -Wall -Werror -Wstrict-prototypes \
+CFLAGS = $(cflags-y) \
+	-Wall -Werror \
+	-Wstrict-prototypes \
+	-Wmissing-prototypes \
 	-ffunction-sections -fdata-sections -Os -ggdb
 
 ldflags-$(CONFIG_LTO) += -flto

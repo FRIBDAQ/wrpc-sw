@@ -12,6 +12,9 @@
 #include <wrc.h>
 #include "softpll_ng.h"
 
+/* For dac-log: send dac values over udp (see daclog command) */
+#include "dev/dac_log.h"
+
 #define MPLL_DISCARD_EARLY_TAGS 10
 #define MPLL_TAG_WRAPAROUND 100000000
 #if defined(CONFIG_TARGET_AMD_DEVBOARD)
@@ -23,10 +26,8 @@
 #undef WITH_SEQUENCING
 
 /* For dac-log: send dac values over udp (see daclog command) */
-#ifdef CONFIG_DAC_LOG
-extern void spll_log_dac(int y);
-#else
-static inline void spll_log_dac(int y) {}
+#ifndef CONFIG_DAC_LOG
+void spll_log_dac(int y) {}
 #endif
 
 #if defined(CONFIG_TARGET_WR_SWITCH)
@@ -444,6 +445,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 			SPLL->DAC_MAIN = SPLL_DAC_MAIN_VALUE_W(y)
 				| SPLL_DAC_MAIN_DAC_SEL_W(s->dac_index);
 		}
+
 		if (s->dac_index == 0)
 			spll_log_dac(y);
 

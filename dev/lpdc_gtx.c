@@ -26,17 +26,18 @@
 
 
 #include <string.h>
-#include <board.h>
+#include "board.h"
 #include "dev/syscon.h"
 #include "dev/endpoint.h"
-#include <softpll_ng.h>
+#include "softpll_ng.h"
 #include "storage.h"
 #include "util.h"
 #include "wrc-debug.h"
 #include "wrc-task.h"
+#include "lpdc.h"
 
-#include <hw/ep_mdio_regs.h>
-#include <hw/lpdc_mdio_regs.h>
+#include "hw/ep_mdio_regs.h"
+#include "hw/lpdc_mdio_regs.h"
 
 #include "dev/clock_monitor.h"
 #include "sfp.h"
@@ -168,7 +169,7 @@ static inline uint16_t mdio_xdrp_read(struct wr_endpoint_device *dev, int locati
 }
 
 
-void dump_xdrp_regs(struct wr_endpoint_device *dev)
+static void __attribute__((unused)) dump_xdrp_regs(struct wr_endpoint_device *dev)
 {
     phy_dbg("[lpdc] XDRP regs dump:\n");
     int i;
@@ -471,7 +472,7 @@ static int update_comma_histogram( struct comma_histogram *hist, uint16_t *patte
 #define LPDC_HIST_INSUFFICIENT_SAMPLES 0
 #define LPDC_HIST_HIT 1
 
-int check_histogram_threshold_hit(struct comma_histogram *hist, int threshold_samples, int border_discount_percent, int bins_filled, int target_comma_pos, int *comma_pos)
+static int check_histogram_threshold_hit(struct comma_histogram *hist, int threshold_samples, int border_discount_percent, int bins_filled, int target_comma_pos, int *comma_pos)
 {
     int i;
     int max_bin_idx = 0, max_bin_value = 0;

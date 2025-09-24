@@ -143,7 +143,7 @@ void ad9910_configure_sync( struct ad9910_device *dev, int enable, int fine_dela
     ad9910_trigger_update( dev );
 }
 
-void ad9910_enable_external_ioupdate( struct ad9910_device *dev, int enable )
+static void __attribute__((unused)) ad9910_enable_external_ioupdate( struct ad9910_device *dev, int enable )
 {
     uint64_t cfr2 = ad9910_read(dev, 1, 32 );
 
