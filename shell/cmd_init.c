@@ -8,11 +8,12 @@
  */
 
 #include <string.h>
-#include <wrc.h>
+#include "wrc.h"
 #include "shell.h"
 #include "storage.h"
 #include "dev/syscon.h"
 #include "dev/i2c.h"
+#include "cmds.h"
 
 static const char * const init_cmds[] =
 {
@@ -22,7 +23,7 @@ static const char * const init_cmds[] =
 	 [3] = "boot",
 };
 
-static int cmd_init(const char *args[])
+int cmd_init(const char *args[])
 {
 	int icmd;
 
@@ -52,8 +53,3 @@ static int cmd_init(const char *args[])
 		return -1;
 	}
 }
-
-DEFINE_WRC_COMMAND(init) = {
-	.name = "init",
-	.exec = cmd_init,
-};

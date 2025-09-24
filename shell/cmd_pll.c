@@ -14,6 +14,7 @@
 #include "hw/softpll_regs.h"
 #include "softpll_ng.h"
 #include "shell.h"
+#include "cmds.h"
 
 #define CMD_INIT 0
 #define CMD_CL 1
@@ -65,7 +66,7 @@ static const unsigned char nargs[] =
 #endif
 };
 
-static int cmd_pll(const char *args[])
+int cmd_pll(const char *args[])
 {
 	unsigned narg;
 	int vals[8];
@@ -131,8 +132,3 @@ static int cmd_pll(const char *args[])
 		return 0;
 	}
 }
-
-DEFINE_WRC_COMMAND(pll) = {
-	.name = "pll",
-	.exec = cmd_pll,
-};

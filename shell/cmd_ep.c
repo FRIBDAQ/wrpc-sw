@@ -9,13 +9,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <wrc.h>
+#include "wrc.h"
 
 #include "shell.h"
 #include "dev/syscon.h"
 #include "dev/endpoint.h"
 #include "hw/ep_mdio_regs.h"
 #include "hw/lpdc_mdio_regs.h"
+#include "cmds.h"
 
 struct reg_desc {
 	const char *name;
@@ -36,7 +37,7 @@ static const char * const ep_cmds[] =
 	 [1] = "rd",
 };
 
-static int cmd_ep(const char *args[])
+int cmd_ep(const char *args[])
 {
 	struct wr_endpoint_device* dev = &wrc_endpoint_dev;
 	int icmd;
@@ -63,8 +64,3 @@ static int cmd_ep(const char *args[])
 		return -1;
 	}
 }
-
-DEFINE_WRC_COMMAND(ep) = {
-	.name = "ep",
-	.exec = cmd_ep,
-};

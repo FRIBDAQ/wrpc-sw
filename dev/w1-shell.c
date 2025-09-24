@@ -2,14 +2,15 @@
  * Onewire generic interface
  * Alessandro Rubini, 2013 GNU GPL2 or later
  */
-#include <wrc.h>
-#include <shell.h>
-#include <dev/w1.h>
+#include "wrc.h"
+#include "shell.h"
+#include "dev/w1.h"
+#include "cmds.h"
 
 #define BLEN 32
 
 /* A shell command, for testing write: "w1w <offset> <byte> [<byte> ...]" */
-static int cmd_w1_w(const char *args[])
+int cmd_w1w(const char *args[])
 {
 	struct w1_dev *w1_dev = w1_find_eeprom_device(&wrpc_w1_bus);
 	int offset, i, blen;
@@ -28,13 +29,8 @@ static int cmd_w1_w(const char *args[])
 	return i == blen ? 0 : -1;
 }
 
-DEFINE_WRC_COMMAND(w1w) = {
-	.name = "w1w",
-	.exec = cmd_w1_w,
-};
-
 /* A shell command, for testing read: "w1r <offset> <len> */
-static int cmd_w1_r(const char *args[])
+int cmd_w1r(const char *args[])
 {
 	struct w1_dev *w1_dev = w1_find_eeprom_device(&wrpc_w1_bus);
 	int offset, i, blen;
@@ -56,13 +52,8 @@ static int cmd_w1_r(const char *args[])
 	return i == blen ? 0 : -1;
 }
 
-DEFINE_WRC_COMMAND(w1r) = {
-	.name = "w1r",
-	.exec = cmd_w1_r,
-};
-
 /* A shell command, for checking */
-static int cmd_w1(const char *args[])
+int cmd_w1(const char *args[])
 {
 	int i;
 	struct w1_dev *d;
@@ -80,9 +71,3 @@ static int cmd_w1(const char *args[])
 	}
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(w1) = {
-	.name = "w1",
-	.exec = cmd_w1,
-};
-

@@ -7,12 +7,13 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
-#include <dev/syscon.h>
 #include <string.h>
-#include <wrc.h>
+#include "wrc.h"
+#include "dev/syscon.h"
 #include "shell.h"
 #include "board.h"
 #include "dev/timecode.h"
+#include "cmds.h"
 
 #define TIMECODE ((volatile struct timecode*) (BASE_TIMECODE))
 
@@ -69,7 +70,7 @@ static int auxtmg_sel(const char *ip)
   return 0;
 }
 
-static int cmd_auxtmg(const char *args[])
+int cmd_auxtmg(const char *args[])
 {
   int icmd = sub_cmd(auxtmg_cmds, ARRAY_SIZE(auxtmg_cmds), args);
 
@@ -93,8 +94,3 @@ static int cmd_auxtmg(const char *args[])
   }
   return 0;
 }
-
-DEFINE_WRC_COMMAND(auxtmg) = {
-  .name = "auxtmg",
-  .exec = cmd_auxtmg,
-};

@@ -6,10 +6,11 @@
  *
  * Released according to the GNU GPL, version 2 or any later version.
  */
-#include <wrc.h>
-#include <shell.h>
+#include "wrc.h"
+#include "shell.h"
+#include "cmds.h"
 
-static int cmd_sleep(const char *args[])
+int cmd_sleep(const char *args[])
 {
 	int sec = 1;
 
@@ -19,8 +20,3 @@ static int cmd_sleep(const char *args[])
 		usleep(1000 * 1000);
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(sleep) = {
-	.name = "sleep",
-	.exec = cmd_sleep,
-};

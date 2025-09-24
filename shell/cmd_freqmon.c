@@ -18,6 +18,7 @@
 
 #include "softpll_ng.h"
 #include "shell.h"
+#include "cmds.h"
 
 #ifdef CONFIG_FREQUENCY_MONITOR
 
@@ -285,7 +286,7 @@ static void cm_check_vcos(const char *args[])
     //    measure_vcxo_freq( ERTM14_CMON_CLK_DMTD, ERTM14_CMON_CLK_REF, 100000, 10, 62500000, set_dmtd_dac, NULL, NULL );
 }
 
-static int cmd_freqmon(const char *args[])
+int cmd_freqmon(const char *args[])
 {
     if (!args[0])
     {
@@ -313,10 +314,5 @@ static int cmd_freqmon(const char *args[])
 
     return 0;
 }
-
-DEFINE_WRC_COMMAND(freqmon) = {
-    .name = "freqmon",
-    .exec = cmd_freqmon,
-};
 
 #endif

@@ -9,13 +9,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <wrc.h>
-#include <lib/ipv4.h>
+#include "wrc.h"
+#include "lib/ipv4.h"
 #include "wrc_global.h"
 
 #include "softpll_ng.h"
 #include "shell.h"
 #include "dev/etherbone.h"
+#include "cmds.h"
 
 void decode_ip(const char *str, unsigned char *ip)
 {
@@ -37,7 +38,7 @@ char *format_ip(char *s, const unsigned char *ip)
 	return s;
 }
 
-static int cmd_ip(const char *args[])
+int cmd_ip(const char *args[])
 {
 	unsigned char ip[4];
 	char buf[20];
@@ -70,8 +71,3 @@ static int cmd_ip(const char *args[])
 	}
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(ip) = {
-	.name = "ip",
-	.exec = cmd_ip,
-};

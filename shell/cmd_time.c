@@ -20,6 +20,7 @@
 #include "shell.h"
 #include "util.h"
 #include "dev/pps_gen.h"
+#include "cmds.h"
 
 static const char * const time_cmds[] =
 {
@@ -29,7 +30,7 @@ static const char * const time_cmds[] =
 	 [3] = "raw",
 };
 
-static int cmd_time(const char *args[])
+int cmd_time(const char *args[])
 {
 	int icmd;
 	uint64_t sec;
@@ -72,8 +73,3 @@ static int cmd_time(const char *args[])
 
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(time) = {
-	.name = "time",
-	.exec = cmd_time,
-};

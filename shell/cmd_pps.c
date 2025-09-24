@@ -21,13 +21,14 @@
 
 #include "shell.h"
 #include "util.h"
+#include "cmds.h"
 
 static const char * const pps_force_map[] = {
 	[pps_force_off] = "off",
 	[pps_force_on]  = "on",
 };
 
-static int cmd_pps(const char *args[])
+int cmd_pps(const char *args[])
 {
 	if (!strcasecmp(args[0], "force")) {
 		if (!strcasecmp(args[1], "on")) {
@@ -42,8 +43,3 @@ static int cmd_pps(const char *args[])
 	pp_printf("PPS force %s\n", pps_force_map[wrc_pps_force(pps_force_check)]);
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(pps) = {
-	.name = "pps",
-	.exec = cmd_pps,
-};

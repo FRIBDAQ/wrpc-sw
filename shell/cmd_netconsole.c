@@ -9,12 +9,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <wrc.h>
+#include "wrc.h"
 
 #include "ppsi/lib.h"
-#include <lib/ipv4.h>
-#include <netconsole.h>
-#include <shell.h>
+#include "lib/ipv4.h"
+#include "netconsole.h"
+#include "shell.h"
+#include "cmds.h"
 
 static void print_netconsole_status(void)
 {
@@ -42,7 +43,7 @@ static void print_netconsole_status(void)
 	}
 }
 
-static int cmd_netconsole(const char *args[])
+int cmd_netconsole(const char *args[])
 {
 	if (!args[0]) {
 		/* do nothing here, later print status */
@@ -68,8 +69,3 @@ static int cmd_netconsole(const char *args[])
 
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(netconsole) = {
-	.name = "netconsole",
-	.exec = cmd_netconsole,
-};

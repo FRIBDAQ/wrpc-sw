@@ -174,8 +174,6 @@ static void wrc_initialize(void)
 	/* try reading t24 phase transition from EEPROM */
 	calib_t24p_load();
 	shell_init();
-	shell_register_commands();
-
 
 	_endram = ENDRAM_MAGIC;
 

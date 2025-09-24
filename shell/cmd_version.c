@@ -7,10 +7,11 @@
  *
  * Released according to the GNU GPL, version 2 or any later version.
  */
-#include <wrc.h>
+#include "wrc.h"
 #include "shell.h"
 #include "dev/syscon.h"
 #include "softpll_ng.h"
+#include "cmds.h"
 
 #ifdef CONFIG_DEVELOPER
 #define SUPPORT " (unsupported developer build)"
@@ -31,7 +32,7 @@
 #define ARCH_STRING "LM32"
 #endif
 
-static int cmd_ver(const char *args[])
+int cmd_ver(const char *args[])
 {
 	int hwram = sysc_get_memsize();
 
@@ -52,8 +53,3 @@ static int cmd_ver(const char *args[])
 
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(ver) = {
-	.name = "ver",
-	.exec = cmd_ver,
-};

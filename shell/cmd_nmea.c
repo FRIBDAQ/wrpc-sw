@@ -7,14 +7,15 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
-#include <dev/syscon.h>
 #include <stdlib.h>
 #include <string.h>
-#include <wrc.h>
+#include "dev/syscon.h"
+#include "wrc.h"
 #include "shell.h"
 #include "board.h"
-#include <hw/timecode_regs.h>
-#include <hw/nmea_master.h>
+#include "hw/timecode_regs.h"
+#include "hw/nmea_master.h"
+#include "cmds.h"
 
 #define NMEA_MASTER ((volatile struct nmea_master*) (BASE_TIMECODE+TIMECODE_NMEA))
 
@@ -136,7 +137,7 @@ static void print_status(void)
   pp_printf("valid: %d tip: %d invert: %d\n", valid, tip, get_invert());
 }
 
-static int cmd_nmea(const char *args[])
+int cmd_nmea(const char *args[])
 {
 
   uint32_t baud;
@@ -168,8 +169,3 @@ static int cmd_nmea(const char *args[])
   }
   return 0;
 }
-
-DEFINE_WRC_COMMAND(nmea) = {
-  .name = "nmea",
-  .exec = cmd_nmea,
-};

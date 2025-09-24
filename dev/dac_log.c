@@ -1,10 +1,11 @@
+#include <string.h>
 #include "wrc.h"
 #include "wrpc.h"
-#include <string.h>
 #include "shell.h"
 #include "lib/ipv4.h"
 #include "dev/netif.h"
 #include "dev/dac_log.h"
+#include "cmds.h"
 
 /* a tx-only socket: no queue is there */
 static DECLARE_WRPC_SOCKET(daclog_socket, 0);
@@ -74,7 +75,7 @@ int daclog_poll(void)
 	return 1;
 }
 
-static int cmd_daclog(const char *args[])
+int cmd_daclog(const char *args[])
 {
 	char b1[32], b2[32];
 
@@ -95,9 +96,3 @@ static int cmd_daclog(const char *args[])
 	ready[0] = ready[1] = 0; /* try to ensure data ordering */
 	return 0;
 }
-
-
-DEFINE_WRC_COMMAND(daclog) = {
-	.name = "daclog",
-	.exec = cmd_daclog,
-};

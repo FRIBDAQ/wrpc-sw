@@ -12,8 +12,9 @@
 #include "shell.h"
 #include "dev/endpoint.h"
 #include "wrc_global.h"
+#include "cmds.h"
 
-static int cmd_vlan(const char *args[])
+int cmd_vlan(const char *args[])
 {
 	int i;
 
@@ -38,8 +39,3 @@ static int cmd_vlan(const char *args[])
 		  wrc_vlan_number, wrc_vlan_number);
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(vlan) = {
-	.name = "vlan",
-	.exec = cmd_vlan,
-};

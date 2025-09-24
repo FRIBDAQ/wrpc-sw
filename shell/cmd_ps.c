@@ -6,15 +6,15 @@
  *
  * Released according to the GNU GPL, version 2 or any later version.
  */
-#include <wrc.h>
 #include <string.h>
-#include <shell.h>
-
+#include "wrc.h"
+#include "shell.h"
 #include "wrc-task.h"
+#include "cmds.h"
 
 extern uint32_t print_task_time_threshold;
 
-static int cmd_ps(const char *args[])
+int cmd_ps(const char *args[])
 {
 	struct wrc_task *t;
 	int i;
@@ -52,8 +52,3 @@ static int cmd_ps(const char *args[])
 	}
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(ps) = {
-	.name = "ps",
-	.exec = cmd_ps,
-};

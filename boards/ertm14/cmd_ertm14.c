@@ -20,6 +20,7 @@
 
 #include "ertm15_rf_distr.h"
 #include "board-aux.h"
+#include "cmds.h"
 
 extern struct wb_clock_monitor_device ertm14_cmon;
 
@@ -239,7 +240,7 @@ extern void streamers_reset_rx_stats(void);
 extern int streamers_get_rx_latency(void);
 extern int streamers_get_rx_timeout(void);
 
-static int cmd_ertm(const char *args[])
+int cmd_ertm(const char *args[])
 {
     struct ertm14_board_state *cstate = ertm14_get_current_state();
     struct ertm14_board_state mask, nstate;
@@ -359,25 +360,9 @@ static int ertm14_monitor_ui(void)
     return 0;
 }
 
-static int cmd_ertm_ui(const char *args[])
+int cmd_eu(const char *args[])
 {
     tmo_init( &ertm14_mon_timer, ERTM14_MON_REFRESH_PERIOD );
 	shell_activate_ui_command( ertm14_monitor_ui );
 	return 0;
-}
-
-DEFINE_WRC_COMMAND(ertm) = {
-	.name = "ertm",
-	.exec = cmd_ertm,
-};
-
-DEFINE_WRC_COMMAND(ertm_ui) = {
-	.name = "eu", // fixme
-	.exec = cmd_ertm_ui,
-};
-
-void ertm14_shell_init()
-{
-    shell_register_command( &__wrc_cmd_ertm );
-    shell_register_command( &__wrc_cmd_ertm_ui );
 }

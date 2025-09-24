@@ -4,9 +4,10 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
-#include <wrc.h>
-#include <shell.h>
-#include <ppsi/ppsi.h>
+#include "wrc.h"
+#include "shell.h"
+#include "ppsi/ppsi.h"
+#include "cmds.h"
 
 #if CONFIG_VERBOSE_DETAIL
 static const char diag_names[8][8] = {
@@ -21,7 +22,7 @@ static const char diag_names[8][8] = {
 };
 #endif
 
-static int cmd_verbose(const char *args[])
+int cmd_verbose(const char *args[])
 {
 	if (args[0])
 		pp_global_d_flags = pp_diag_parse(args[0]);
@@ -33,8 +34,3 @@ static int cmd_verbose(const char *args[])
 #endif
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(verbose) = {
-	.name = "verbose",
-	.exec = cmd_verbose,
-};

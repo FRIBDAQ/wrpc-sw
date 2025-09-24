@@ -23,12 +23,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
-#include <wrc.h>
+#include "wrc.h"
 
 #include "shell.h"
 #include "storage.h"
 #include "dev/syscon.h"
 #include "dev/endpoint.h"
+#include "cmds.h"
 
 #include "sfp.h"
 #include "libwr/sfp_lib.h"
@@ -131,7 +132,7 @@ static const char * const sfp_cmds[] =
 #endif
 };
 
-static int cmd_sfp(const char *args[])
+int cmd_sfp(const char *args[])
 {
 	int icmd;
 
@@ -262,8 +263,3 @@ static int cmd_sfp(const char *args[])
 		return -1;
 	}
 }
-
-DEFINE_WRC_COMMAND(sfp) = {
-	.name = "sfp",
-	.exec = cmd_sfp,
-};

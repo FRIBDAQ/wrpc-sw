@@ -7,13 +7,14 @@
  * Released according to the GNU GPL, version 2 or any later version.
  */
 
-#include "shell.h"
-#include <wrc.h>
-#include <dev/syscon.h>
 #include <string.h>
 #include <errno.h>
+#include "shell.h"
+#include "wrc.h"
+#include "dev/syscon.h"
+#include "cmds.h"
 
-static int cmd_diag(const char *args[])
+int cmd_diag(const char *args[])
 {
 	uint32_t id, ver, nrw, nro;
 	uint32_t addr, val;
@@ -77,8 +78,3 @@ static int cmd_diag(const char *args[])
 
 	return -EINVAL;
 }
-
-DEFINE_WRC_COMMAND(diag) = {
-	.name = "diag",
-	.exec = cmd_diag,
-};

@@ -19,6 +19,7 @@
 #include "storage.h"
 #include "dev/syscon.h"
 #include "dev/rxts_calibrator.h"
+#include "cmds.h"
 
 static const char * const calib_cmds[] =
 {
@@ -30,7 +31,7 @@ static const char * const calib_cmds[] =
 #endif
 };
 
-static int cmd_calibration(const char *args[])
+int cmd_calibration(const char *args[])
 {
 	int icmd;
 
@@ -98,8 +99,3 @@ static int cmd_calibration(const char *args[])
 		return icmd;
 	}
 }
-
-DEFINE_WRC_COMMAND(calibration) = {
-	.name = "calibration",
-	.exec = cmd_calibration,
-};

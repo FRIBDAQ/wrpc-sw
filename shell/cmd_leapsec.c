@@ -21,12 +21,13 @@
 
 #include "shell.h"
 #include "util.h"
+#include "cmds.h"
 
 /* Setting leap second makes sense only for GM. For other modes leap seconds
  * counter is received from a master (slave) or is hardcoded in PPSI (master).
  * In master it is hardcoded to PP_DEFAULT_UTC_OFFSET, since master mode does
  * not have timescale set. */
-static int cmd_leapsec(const char *args[])
+int cmd_leapsec(const char *args[])
 {
 	int ptp_offset, system_offset;
 
@@ -42,8 +43,3 @@ static int cmd_leapsec(const char *args[])
 
 	return 0;
 }
-
-DEFINE_WRC_COMMAND(leapsec) = {
-	.name = "leapsec",
-	.exec = cmd_leapsec,
-};

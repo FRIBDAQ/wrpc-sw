@@ -267,4 +267,8 @@ struct ertm14_version_info {
 			firmware_metadata;
 };
 
+#define BOARD_COMMANDS \
+  WRC_COMMAND(ertm) \
+  WRC_COMMAND(eu)
+
 #endif /*  __BOARD_STATE_ERTM14_H */
