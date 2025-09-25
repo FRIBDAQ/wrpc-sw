@@ -48,7 +48,7 @@ obj-$(CONFIG_TARGET_WR_SWITCH) += dev/timer-wrs.o dev/gpio.o
 obj-$(CONFIG_PUTS_SYSLOG) += dev/puts-syslog.o
 
 obj-$(CONFIG_DAC_LOG) += dev/dac_log.o
-obj-$(CONFIG_W1) +=		dev/w1.o	dev/w1-hw.o	dev/w1-shell.o
+obj-$(CONFIG_W1) +=		dev/w1.o	dev/w1-hw.o
 obj-$(CONFIG_W1_EEPROM) +=	dev/w1-eeprom.o
 obj-$(CONFIG_W1_TEMP) +=	dev/temp-w1.o dev/w1-temp.o
 
