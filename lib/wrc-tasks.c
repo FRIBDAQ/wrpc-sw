@@ -1,7 +1,7 @@
-#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 
+#include "assert.h"
 #include "wrc.h"
 #include "wrc-task.h"
 #include "dev/pps_gen.h"
@@ -15,20 +15,29 @@ static uint32_t prev_nanos_for_profile;
 static uint32_t prev_ticks_for_profile;
 uint32_t print_task_time_threshold = CONFIG_DEFAULT_PRINT_TASK_TIME_THRESHOLD;
 
-static struct wrc_task tasks[] =
+struct wrc_task {
+	const char *name;
+	int (*enabled)(void);
+	void (*init)(void);
+	int (*job)(void);
+};
+
+static const struct wrc_task tasks[] =
   {
 #undef DEF_TASK
 #define NO_INIT NULL
 #define NO_ENABLED NULL
 #define NO_JOB NULL
 #define DEF_TASK(NAME, INIT, JOB, ENABLED)	\
-    { NAME, ENABLED, INIT, JOB, 0, 0, 0 },
+    { NAME, ENABLED, INIT, JOB },
 #include "tasks.h"
   };
 
 #define WRC_NBR_TASKS ARRAY_SIZE(tasks)
 
-static void task_time_normalize(struct wrc_task *t)
+static struct wrc_task_usage tasks_usage[WRC_NBR_TASKS];
+
+static void task_time_normalize(struct wrc_task_usage *t)
 {
 	if (t->nanos > 1000 * 1000 * 1000) {
 		t->nanos -= 1000 * 1000 * 1000;
@@ -37,15 +46,16 @@ static void task_time_normalize(struct wrc_task *t)
 }
 
 /* Account the time to either this task or task 0 */
-static void account_task(struct wrc_task *t, int done_sth)
+static void account_task(unsigned tid, int done_sth)
 {
+	struct wrc_task_usage *t = &tasks_usage[tid];
 	uint32_t nanos;
 	signed int delta;
 	uint32_t ticks;
 	signed int delta_ticks;
 
 	if (!done_sth)
-		t = &tasks[0]; /* task 0 is special */
+		t = &tasks_usage[0]; /* task 0 is special */
 	shw_pps_gen_get_time(NULL, &nanos);
 	/* get monotonic number of ticks */
 	ticks = timer_get_tics();
@@ -67,37 +77,50 @@ static void account_task(struct wrc_task *t, int done_sth)
 			/* Print only if threshold is set */
 			pp_printf("New max run time for a task %s, old %ld, "
 				  "new %d\n",
-				  t->name, t->max_run_ticks, delta_ticks);
+				  wrc_task_get_name(tid),
+				  t->max_run_ticks, delta_ticks);
 		}
 		t->max_run_ticks = delta_ticks;
 	}
 	if (print_task_time_threshold
             && delta_ticks > print_task_time_threshold)
-		pp_printf("task %s, run for %d ms\n", t->name, delta_ticks);
+		pp_printf("task %s, run for %d ms\n",
+			  wrc_task_get_name(tid), delta_ticks);
 
 	prev_ticks_for_profile = ticks;
 }
 
 /* Run a task with profiling */
-static void wrc_run_task(struct wrc_task *t)
+static void wrc_run_task(unsigned tid)
 {
+	const struct wrc_task *t = &tasks[tid];
+	struct wrc_task_usage *u = &tasks_usage[tid];
 	int done_sth = 0;
 
 	if (!t->job) /* idle task, just count iterations */
-		t->nrun++;
+		u->nrun++;
 	else if (!t->enabled || t->enabled() ) {
 		/* either enabled or without a check variable */
 		done_sth = t->job();
-		t->nrun += done_sth;
+		u->nrun += done_sth;
 	}
-	account_task(t, done_sth);
+	account_task(tid, done_sth);
 }
 
-struct wrc_task *wrc_task_get(int tid)
+struct wrc_task_usage *wrc_task_get_usage(int tid)
 {
-	if (tid >= WRC_NBR_TASKS)
-		return NULL;
-	return &tasks[tid];
+	assert (tid < WRC_NBR_TASKS, "invalid tid");
+	return &tasks_usage[tid];
+}
+
+const char *wrc_task_get_name(int tid)
+{
+	return tasks[tid].name;
+}
+
+unsigned wrc_task_nbr(void)
+{
+	return WRC_NBR_TASKS;
 }
 
 void wrc_poll_all_tasks(void)
@@ -105,7 +128,7 @@ void wrc_poll_all_tasks(void)
 	int i;
 
 	for( i = 0; i < WRC_NBR_TASKS; i++ )
-		wrc_run_task( &tasks[i] );
+		wrc_run_task(i);
 }
 
 void wrc_tasks_run_inits(void)

@@ -16,16 +16,13 @@ extern uint32_t print_task_time_threshold;
 
 int cmd_ps(const char *args[])
 {
-	struct wrc_task *t;
+	struct wrc_task_usage *t;
 	int i;
 
 	if (args[0]) {
 		if(!strcasecmp(args[0], "reset")) {
-			for(i = 0; ; i++)
-			{
-				t = wrc_task_get(i);
-				if(!t)
-					return 0;
+			for(i = 0; i < wrc_task_nbr() ; i++) {
+				t = wrc_task_get_usage(i);
 				t->nrun = t->seconds = t->nanos = t->max_run_ticks = 0;
 			}
 			return 0;
@@ -38,13 +35,12 @@ int cmd_ps(const char *args[])
 		}
 	}
 	pp_printf(" iterations     seconds.micros    max_ms name\n");
-	for(i = 0; ; i++)
+	for(i = 0; i < wrc_task_nbr() ; i++)
 	{
-		t = wrc_task_get(i);
-		if(!t)
-			return 0;
+		t = wrc_task_get_usage(i);
 		pp_printf("%11lu   %9lu.%06lu %9lu %s\n", t->nrun,
-					t->seconds, t->nanos/1000, t->max_run_ticks, t->name);
+			  t->seconds, t->nanos/1000, t->max_run_ticks,
+			  wrc_task_get_name(i));
 	}
 	return 0;
 }

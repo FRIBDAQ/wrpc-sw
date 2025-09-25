@@ -6,19 +6,13 @@
 #ifndef __WRC_TASK_H__
 #define __WRC_TASK_H__
 
-#include <board.h>
-
 /*
  * A task is a data structure, but currently suboptimal.
  * FIXME: init must return int, and both should get a pointer to data
  * (but doing this is heavy, and forces to change the submodule too).
  */
 
-struct wrc_task {
-	const char *name;
-	int (*enabled)(void);
-	void (*init)(void);
-	int (*job)(void);
+struct wrc_task_usage {
 	/* And we keep statistics about cpu usage */
 	unsigned long nrun;
 	unsigned long seconds;
@@ -26,7 +20,9 @@ struct wrc_task {
 	unsigned long max_run_ticks; /* in ticks */
 };
 
-struct wrc_task *wrc_task_get(int tid);
+struct wrc_task_usage *wrc_task_get_usage(int tid);
+const char *wrc_task_get_name(int tid);
+unsigned wrc_task_nbr(void);
 void wrc_tasks_run_inits(void);
 void wrc_poll_all_tasks(void);
 void wrc_tasks_accounting_init(void);
