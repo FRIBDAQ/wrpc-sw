@@ -69,8 +69,3 @@ int wrc_board_init(void)
 
 	return 0;
 }
-
-int wrc_board_create_tasks()
-{
-    return 0;
-}

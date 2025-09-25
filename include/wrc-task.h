@@ -8,10 +8,6 @@
 
 #include <board.h>
 
-#ifndef WRC_MAX_TASKS
-# define WRC_MAX_TASKS 20
-#endif
-
 /*
  * A task is a data structure, but currently suboptimal.
  * FIXME: init must return int, and both should get a pointer to data
@@ -30,10 +26,6 @@ struct wrc_task {
 	unsigned long max_run_ticks; /* in ticks */
 };
 
-extern struct wrc_task tasks[WRC_MAX_TASKS];
-
-struct wrc_task* wrc_task_create( const char *name, void (*init)(void), int (*job)(void) );
-void wrc_task_set_enable( struct wrc_task* task, int (*enabled)(void) );
 struct wrc_task *wrc_task_get(int tid);
 void wrc_tasks_run_inits(void);
 void wrc_poll_all_tasks(void);

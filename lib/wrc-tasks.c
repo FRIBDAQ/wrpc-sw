@@ -5,6 +5,7 @@
 #include "wrc.h"
 #include "wrc-task.h"
 #include "dev/pps_gen.h"
+#include "tasks.h"
 
 #ifndef CONFIG_DEFAULT_PRINT_TASK_TIME_THRESHOLD
 	#define CONFIG_DEFAULT_PRINT_TASK_TIME_THRESHOLD 0
@@ -14,7 +15,18 @@ static uint32_t prev_nanos_for_profile;
 static uint32_t prev_ticks_for_profile;
 uint32_t print_task_time_threshold = CONFIG_DEFAULT_PRINT_TASK_TIME_THRESHOLD;
 
-struct wrc_task tasks[WRC_MAX_TASKS];
+static struct wrc_task tasks[] =
+  {
+#undef DEF_TASK
+#define NO_INIT NULL
+#define NO_ENABLED NULL
+#define NO_JOB NULL
+#define DEF_TASK(NAME, INIT, JOB, ENABLED)	\
+    { NAME, ENABLED, INIT, JOB, 0, 0, 0 },
+#include "tasks.h"
+  };
+
+#define WRC_NBR_TASKS ARRAY_SIZE(tasks)
 
 static void task_time_normalize(struct wrc_task *t)
 {
@@ -81,56 +93,27 @@ static void wrc_run_task(struct wrc_task *t)
 	account_task(t, done_sth);
 }
 
-struct wrc_task* wrc_task_create( const char *name, void (*init)(void), int (*job)(void) )
-{
-	struct wrc_task *t = NULL;
-	int i;
-
-	for(i = 0; i < WRC_MAX_TASKS; i++)
-		if(!tasks[i].name)
-		{
-			t = &tasks[i];
-			break;
-		}
-	if(!t)
-	{
-		main_dbg("wrc_task_create() failed due to too many tasks (%d)\n", WRC_MAX_TASKS);
-		return NULL;
-	}
-
-	t->init = init;
-	t->job = job;
-	t->name = name;
-	t->enabled = NULL;
-
-	return t;
-}
-
 struct wrc_task *wrc_task_get(int tid)
 {
-    return &tasks[tid];
-}
-
-void wrc_task_set_enable( struct wrc_task* task, int (*enabled)(void) )
-{
-    task->enabled = enabled;
+	if (tid >= WRC_NBR_TASKS)
+		return NULL;
+	return &tasks[tid];
 }
 
 void wrc_poll_all_tasks(void)
 {
 	int i;
 
-	for( i = 0; i < WRC_MAX_TASKS; i++ )
-		if( tasks[i].name )
-			wrc_run_task( &tasks[i] );
+	for( i = 0; i < WRC_NBR_TASKS; i++ )
+		wrc_run_task( &tasks[i] );
 }
 
 void wrc_tasks_run_inits(void)
 {
 	int i;
 
-	for( i = 0; i < WRC_MAX_TASKS; i++ )
-		if( tasks[i].name && tasks[i].init )
+	for( i = 0; i < WRC_NBR_TASKS; i++ )
+		if(tasks[i].init)
 			tasks[i].init();
 }
 
