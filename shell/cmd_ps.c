@@ -26,7 +26,7 @@ int cmd_ps(const char *args[])
 				t = wrc_task_get(i);
 				if(!t)
 					return 0;
-				if(!t->used)
+				if(!t->name)
 					continue;
 				t->nrun = t->seconds = t->nanos = t->max_run_ticks = 0;
 			}
@@ -45,7 +45,7 @@ int cmd_ps(const char *args[])
 		t = wrc_task_get(i);
 		if(!t)
 			return 0;
-		if(!t->used)
+		if(!t->name)
 			continue;
 		pp_printf("%11lu   %9lu.%06lu %9lu %s\n", t->nrun,
 					t->seconds, t->nanos/1000, t->max_run_ticks, t->name);

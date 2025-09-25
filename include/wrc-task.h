@@ -19,8 +19,7 @@
  */
 
 struct wrc_task {
-	int used;
-	char name[16];
+	const char *name;
 	int (*enabled)(void);
 	void (*init)(void);
 	int (*job)(void);
@@ -33,7 +32,6 @@ struct wrc_task {
 
 extern struct wrc_task tasks[WRC_MAX_TASKS];
 
-void wrc_tasks_preinit(void);
 struct wrc_task* wrc_task_create( const char *name, void (*init)(void), int (*job)(void) );
 void wrc_task_set_enable( struct wrc_task* task, int (*enabled)(void) );
 struct wrc_task *wrc_task_get(int tid);

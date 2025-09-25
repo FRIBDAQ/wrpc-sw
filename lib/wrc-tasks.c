@@ -87,7 +87,7 @@ struct wrc_task* wrc_task_create( const char *name, void (*init)(void), int (*jo
 	int i;
 
 	for(i = 0; i < WRC_MAX_TASKS; i++)
-		if(!tasks[i].used)
+		if(!tasks[i].name)
 		{
 			t = &tasks[i];
 			break;
@@ -98,12 +98,10 @@ struct wrc_task* wrc_task_create( const char *name, void (*init)(void), int (*jo
 		return NULL;
 	}
 
-	t->used = 1;
 	t->init = init;
 	t->job = job;
+	t->name = name;
 	t->enabled = NULL;
-
-	strncpy(t->name, name, 16);
 
 	return t;
 }
@@ -118,20 +116,13 @@ void wrc_task_set_enable( struct wrc_task* task, int (*enabled)(void) )
     task->enabled = enabled;
 }
 
-void wrc_tasks_preinit(void)
-{
-   	memset(&tasks, 0, sizeof(struct wrc_task) * WRC_MAX_TASKS);
-}
-
 void wrc_poll_all_tasks(void)
 {
 	int i;
 
 	for( i = 0; i < WRC_MAX_TASKS; i++ )
-		if( tasks[i].used )
-		{
+		if( tasks[i].name )
 			wrc_run_task( &tasks[i] );
-		}
 }
 
 void wrc_tasks_run_inits(void)
@@ -139,10 +130,8 @@ void wrc_tasks_run_inits(void)
 	int i;
 
 	for( i = 0; i < WRC_MAX_TASKS; i++ )
-		if( tasks[i].used && tasks[i].init )
-		{
+		if( tasks[i].name && tasks[i].init )
 			tasks[i].init();
-		}
 }
 
 void wrc_tasks_accounting_init(void)

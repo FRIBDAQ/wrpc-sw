@@ -259,9 +259,6 @@ static void create_tasks(void)
 {
 	struct wrc_task *t;
 
-	/* clear task table in case of a reset */
-	wrc_tasks_preinit();
-
 	/* create all other tasks */
 	wrc_task_create( "idle", NULL, NULL );
 	wrc_task_create( "check-link", NULL, wrc_check_link );
