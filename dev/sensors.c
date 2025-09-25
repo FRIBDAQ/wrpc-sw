@@ -69,7 +69,6 @@ struct wrc_sensor* wrc_sensor_find_by_type(uint8_t type)
 /*
  * The shell command
  */
-#ifdef CONFIG_CMD_TEMP_SENSORS
 static const char* sensor_type_string( uint8_t flags )
 {
 	if ( flags & WRC_SENSOR_TEMP_CELSIUS )
@@ -112,6 +111,5 @@ int cmd_sensors(const char *args[])
 
 	return 0;
 }
-#endif /* CONFIG_CMD_TEMP_SENSORS */
 
 #endif /* CONFIG_GENERIC_SENSORS */

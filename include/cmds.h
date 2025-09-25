@@ -36,8 +36,6 @@ WRC_COMMAND(calibration)
 #endif
 #ifdef CONFIG_CMD_LL
   WRC_COMMAND(delays)
-#endif
-#ifdef CONFIG_CMD_LL
   WRC_COMMAND(devmem)
 #endif
 #ifdef CONFIG_AUX_DIAG
@@ -60,7 +58,7 @@ WRC_COMMAND(init)
 #ifdef CONFIG_CMD_LEAPSEC
   WRC_COMMAND(leapsec)
 #endif
-#ifdef CONFIG_CMD_LATENCY_PROBE
+#ifdef CONFIG_LATENCY_PROBE
   WRC_COMMAND(ltest)
 #endif
 WRC_COMMAND(mac)
@@ -82,29 +80,29 @@ WRC_COMMAND(ptrack)
   WRC_COMMAND(refresh)
 #endif
 WRC_COMMAND(sdb)
-#ifdef CONFIG_CMD_GENERIC_SENSORS
+#ifdef CONFIG_GENERIC_SENSORS
   WRC_COMMAND(sensors)
 #endif
 WRC_COMMAND(sfp)
 WRC_COMMAND(sleep)
 WRC_COMMAND(stat)
-#ifdef CONFIG_CMD_SYSLOG
+#ifdef CONFIG_SYSLOG
   WRC_COMMAND(syslog)
 #endif
-#ifdef CONFIG_CMD_TEMP_SENSORS
+#ifdef CONFIG_TEMP_SENSORS
   WRC_COMMAND(temp)
 #endif
 WRC_COMMAND(time)
 WRC_COMMAND(uptime)
 WRC_COMMAND(ver)
 WRC_COMMAND(verbose)
-#ifdef CONFIG_CMD_VLANS
+#ifdef CONFIG_VLAN
   WRC_COMMAND(vlan)
 #endif
-#ifdef CONFIG_CMD_W1_TEMP
+#ifdef CONFIG_W1_TEMP
   WRC_COMMAND(w1)
 #endif
-#ifdef CONFIG_CMD_W1_EEPROM
+#ifdef CONFIG_W1_EEPROM
   WRC_COMMAND(w1r)
   WRC_COMMAND(w1w)
 #endif

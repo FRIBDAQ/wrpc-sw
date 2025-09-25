@@ -142,7 +142,6 @@ int wrc_temp_refresh(void)
 /*
  * The shell command
  */
-#ifdef CONFIG_CMD_TEMP_SENSORS
 int cmd_temp(const char *args[])
 {
 	char buffer[80];
@@ -151,4 +150,3 @@ int cmd_temp(const char *args[])
 	pp_printf("%s\n", buffer);
 	return 0;
 }
-#endif /* CONFIG_CMD_TEMP_SENSORS */
