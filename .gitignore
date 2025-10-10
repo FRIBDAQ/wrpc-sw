@@ -27,3 +27,8 @@ size_info.txt
 disasm.S
 .gdbinit
 /cache/
+arch/risc-v/ram.ld
+gitmodules
+tools/wrpc
+tools/wrpc-load
+wrc.size
