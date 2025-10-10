@@ -25,9 +25,6 @@ ALL-$(CONFIG_WRPC_PPSI)  += wrpc-dump
 
 ALL+= $(ALL-y)
 
-ifneq ($(EB),no)
-ALL += eb-w1-write
-endif
 ifneq ($(SDBFS),no)
 ALL += sdb-wrpc.bin
 endif
@@ -52,8 +49,6 @@ OBJDUMP		= objdump
 # some tools may be compiled to run on a target machine
 CC_TARGET_HOST = $(CROSS_COMPILE_TARGET_HOST)gcc
 
-
-
 ifeq ($(CONFIG_TARGET_ERTM14), y)
 SUPPORT_ERTM=y
 endif
@@ -74,9 +69,6 @@ wrpc-w1-read: wrpc-w1-read.c ../dev/w1.c ../dev/w1-eeprom.c ../dev/w1-hw.c
 
 wrpc-w1-write: wrpc-w1-write.c ../dev/w1.c ../dev/w1-eeprom.c ../dev/w1-hw.c
 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
-
-eb-w1-write: eb-w1-write.c ../dev/w1.c ../dev/w1-eeprom.c eb-w1.c
-	$(CC) $(CFLAGS) -I $(EB) $^ $(LDFLAGS) -o $@ -L $(EB)/.libs -letherbone
 
 GENSDBFS_SRCS = gensdbfs.c
 
