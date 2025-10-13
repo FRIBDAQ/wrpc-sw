@@ -45,8 +45,8 @@
    are safely clocked into the PHY (tx_out_clk domain).
    set tx_out_clk 4 ns before clk_ref_62m5 so there is 12 ns setup time.
 */
-#define LPDC_COARSE_PHASE_MIN_PS 11750   /* ps */
-#define LPDC_COARSE_PHASE_MAX_PS 12250   /* ps */
+#define LPDC_COARSE_PHASE_MIN_PS 7800   /* ps */
+#define LPDC_COARSE_PHASE_MAX_PS 7900   /* ps */
 #define LPDC_FINE_PHASE_TOLLERANCE_PS 50 /* ps */
 #define LPDC_MAX_ATTEMPS_TX_SETUP_STATE_RESET_PCS 2000
 #define LPDC_MAX_ATTEMPS_RX_SETUP_STATE_RESET_PCS 100
