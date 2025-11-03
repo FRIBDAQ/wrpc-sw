@@ -339,12 +339,13 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 
 #endif
 
-	y = pi_update(&s->pi, err);
-	if(!s->vco_freeze)
-	{
+	if(!s->vco_freeze) {
+		y = pi_update(&s->pi, err);
 		SPLL->DAC_MAIN = SPLL_DAC_MAIN_VALUE_W(y)
 			| SPLL_DAC_MAIN_DAC_SEL_W(s->dac_index);
 	}
+	else
+		y = s->pi.y;
 	if (s->dac_index == 0)
 		spll_log_dac(y);
 
