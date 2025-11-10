@@ -1575,14 +1575,20 @@ static int wr_vuart_rx(struct board *board)
  * It transmits a single byte
  * @param[in] vuart token from dev_map()
  */
-static void wr_vuart_tx(struct board *board, char data)
+static int wr_vuart_tx(struct board *board, char data)
 {
-	int sr = vuart_readl(board, UART_REG_SR );
+	unsigned count;
 
-	while(sr & UART_SR_RX_RDY)
-		 sr = vuart_readl(board, UART_REG_SR );
+	for (count = 0; count < 2000; count++) {
+		int sr = vuart_readl(board, UART_REG_HOST_TDR);
+		if (sr & UART_HOST_TDR_RDY) {
+			vuart_writel(board, UART_HOST_TDR_DATA_W(data), UART_REG_HOST_TDR);
+			return 0;
+		}
+		usleep (500);
+	}
 
-	vuart_writel(board, UART_HOST_TDR_DATA_W(data), UART_REG_HOST_TDR );
+	return -1;
 }
 
 /**
@@ -1627,10 +1633,12 @@ static void wr_vuart_flush(struct board *board)
  * @param[in] buf buffer to write
  * @param[in] size numeber of bytes to write
  */
-static void wr_vuart_write(struct board *board, char *buf, size_t size)
+static int wr_vuart_write(struct board *board, char *buf, size_t size)
 {
 	while(size--)
-		wr_vuart_tx(board, *buf++);
+		if (wr_vuart_tx(board, *buf++) < 0)
+			return -1;
+	return 0;
 }
 
 static void wrpc_vuart_set_tty_raw(struct termios *old_termios)
@@ -1681,7 +1689,7 @@ static void wrpc_vuart_term(struct board *board,
                 start_time = get_running_secs();
 
 	while(!need_exit) {
-		struct timeval tv = {0, 10000};
+		struct timeval tv = {0, 10000}; /* 10ms */
 
 		FD_ZERO(&fds);
 		FD_SET(STDIN_FILENO, &fds);
@@ -1714,7 +1722,9 @@ static void wrpc_vuart_term(struct board *board,
 				break;
 			}
 
-			wr_vuart_tx(board, tx);
+			if (wr_vuart_tx(board, tx) < 0) {
+				fprintf(stderr, "sent character is not read\n");
+			}
 			break;
 		}
 
