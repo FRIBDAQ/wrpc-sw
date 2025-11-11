@@ -85,13 +85,6 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 	s->sign_offset += adj_tab[index + s->preserve_sign];
 	s->preserve_sign = index << 2;
 	
-	if(spll_debug_en)
-	{
-		spll_debug( SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_TAG, delta, 0);
-		spll_debug( SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_ERR,
-			    s->sign_offset >> HPLL_N, 1);
-	}
-
 	s->acc += delta + s->sign_offset;
 	s->avg_count ++;
 
@@ -113,12 +106,5 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 		s->phase_val = phase;
 		s->acc = 0;
 		s->avg_count = 0;
-
-		if(spll_debug_en && s->dbg_channel >= 0 ) {
-			spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_Y, phase, 0);
-			spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_TAG, avg, 0);
-			spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_TAG, ((unsigned)avg) >> 16, 0);
-			spll_debug( SPLL_DBG_SRC_AUX(s->dbg_channel), SPLL_DBG_SIGNAL_ERR, s->offset >> 14, 1);
-		}
 	}
 }
