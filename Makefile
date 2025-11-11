@@ -246,6 +246,7 @@ clean: boards-clean
 		$(LDS) \
 		$(OUTPUT).bin rules-*.bin \
 		$(OUTPUT).bram $(OUTPUT).vhd $(OUTPUT).mif $(OUTPUT)_disasm.S
+	rm -f dump_mem_ppsi_wrpc.o dump-info.o
 	rm -f $(OBJS:.o=.d)
 	$(MAKE) -C $(PPSI) clean
 	$(MAKE) -C tools clean
