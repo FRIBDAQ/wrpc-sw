@@ -96,7 +96,6 @@ uint32_t endian_flag; /* from dump_info[0], lazily */
 
 int print_labels = 1;
 
-
 void print_str(char *s)
 {
     if (print_labels == 0)
