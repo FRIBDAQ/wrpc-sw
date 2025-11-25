@@ -9,7 +9,6 @@
 
 #define BLEN 32
 
-#ifdef CONFIG_W1_EEPROM
 /* A shell command, for testing write: "w1w <offset> <byte> [<byte> ...]" */
 int cmd_w1w(const char *args[])
 {
@@ -52,26 +51,3 @@ int cmd_w1r(const char *args[])
 	}
 	return i == blen ? 0 : -1;
 }
-#endif /* CONFIG_W1_EEPROM */
-
-#ifdef CONFIG_W1_TEMP
-/* A shell command, for checking */
-int cmd_w1(const char *args[])
-{
-	int i;
-	struct w1_dev *d;
-	int32_t temp;
-
-	for (i = 0; i < W1_MAX_DEVICES; i++) {
-		d = wrpc_w1_bus.devs + i;
-		if (d->rom) {
-			pp_printf("device %i: %08x%08x\n", i,
-				  (int)(d->rom >> 32), (int)d->rom);
-		temp = w1_read_temp(d, 0);
-		pp_printf("temp: %d.%04d\n", (int) (temp >> 16),
-			  (int)((temp & 0xffff) * 10 * 1000 >> 16));
-		}
-	}
-	return 0;
-}
-#endif /* CONFIG_W1_TEMP */

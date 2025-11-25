@@ -35,3 +35,5 @@ obj-$(CONFIG_AUX_DIAG) += 		shell/cmd_diag.o
 obj-$(CONFIG_CMD_AUXCLK) +=		shell/cmd_auxclk.o
 obj-$(CONFIG_CMD_NMEA) +=		shell/cmd_nmea.o
 obj-$(CONFIG_CMD_AUXTMG) +=		shell/cmd_auxtmg.o
+obj-$(CONFIG_W1_EEPROM) +=		shell/cmd_w1_eeprom.o
+obj-$(CONFIG_W1_TEMP) +=		shell/cmd_w1_temp.o
