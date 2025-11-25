@@ -73,7 +73,7 @@ void helper_init(struct spll_helper_state *s, int ref_channel)
 void helper_update(struct spll_helper_state *s, int tag,
 			 int source)
 {
-#if defined(CONFIG_IGNORE_HPLL)
+#ifdef CONFIG_IGNORE_HPLL
 	s->ld.lock_changed = 1;
 	s->ld.locked = 1;
 #else
