@@ -123,7 +123,7 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 
 	s->freq_prelock_gain_boost = MPLL_FREQ_PRELOCK_GAIN_BOOST;
 
-	s->phase_ld.threshold = 1200; //4 * (1 << 14); 
+	s->phase_ld.threshold = 2000; //4 * (1 << 14); 
 	s->phase_ld.lock_samples = 1000;
 	s->phase_ld.delock_samples = 100;
 
