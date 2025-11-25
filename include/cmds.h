@@ -79,6 +79,9 @@ WRC_COMMAND(ptrack)
 #ifdef CONFIG_CMD_REFRESH
   WRC_COMMAND(refresh)
 #endif
+#ifdef CONFIG_LPDC_GTHE4_RXPI
+  WRC_COMMAND(rxpi)
+#endif
 WRC_COMMAND(sdb)
 #ifdef CONFIG_GENERIC_SENSORS
   WRC_COMMAND(sensors)

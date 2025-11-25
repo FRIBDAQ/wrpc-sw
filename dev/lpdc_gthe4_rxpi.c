@@ -26,6 +26,7 @@
 #include "util.h"
 #include "wrc-debug.h"
 #include "shell.h"
+#include "cmds.h"
 #include "lpdc.h"
 
 #include "hw/ep_mdio_regs.h"
@@ -310,7 +311,7 @@ static const char * const rxpi_cmds[] =
 	 [0] = "sweep",
 };
 
-static int cmd_rxpi(const char *args[])
+int cmd_rxpi(const char *args[])
 {
 	int icmd;
 
@@ -330,8 +331,3 @@ static int cmd_rxpi(const char *args[])
 	    return -1;
 	}
 }
-
-DEFINE_WRC_COMMAND(rxpi) = {
-	.name = "rxpi",
-	.exec = cmd_rxpi,
-};
