@@ -271,4 +271,15 @@ struct ertm14_version_info {
   WRC_COMMAND(ertm) \
   WRC_COMMAND(eu)
 
+#define BOARD_TASKS \
+  DEF_TASK("events-ptp", wrc_events_ptp_init, wrc_events_ptp_poll, NO_ENABLED) \
+  DEF_TASK("control-uart", NO_INIT, control_uart_poll, NO_ENABLED)	\
+  DEF_TASK("mmc14", mmc14_link_init, mmc14_link_poll, NO_ENABLED)	\
+  DEF_TASK("leds", NO_INIT, ertm14_update_leds, NO_ENABLED)		\
+  DEF_TASK("spll-dbg", ertm14_spll_debug_dump_task_init, ertm14_spll_debug_dump_task_poll, NO_ENABLED) \
+  DEF_TASK("rf-nco-sync", ertm14_dds_nco_sync_init, ertm14_dds_nco_sync_task, has_ertm15 ) \
+  DEF_TASK("clkab-sync", ertm14_clkab_sync_init, ertm14_clkab_sync_task, has_ertm15 ) \
+  DEF_TASK("mmc15", mmc15_link_init, mmc15_link_poll, has_ertm15 ) \
+  DEF_TASK("rf-monitor", ertm15_init_rf_monitor, ertm15_update_rf_monitor, has_ertm15 )
+
 #endif /*  __BOARD_STATE_ERTM14_H */

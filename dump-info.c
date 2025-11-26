@@ -38,15 +38,10 @@ struct dump_info  dump_wrpc_info[] = {
 	DUMP_FIELD_SIZE(bina, mac_addr, ETH_ALEN),
 
 #undef DUMP_STRUCT
-#define DUMP_STRUCT struct wrc_task
+#define DUMP_STRUCT struct wrc_task_usage
 	/* Save the size of the structure, there is no other way to pass
 	 * the size of wrc_task structure */
-	DUMP_HEADER_SIZE("wrc_task", sizeof(struct wrc_task)),
-	DUMP_FIELD(int, used),
-	DUMP_FIELD_SIZE(char, name, 16),
-	DUMP_FIELD(pointer, enabled), /* pointer to a function */
-	DUMP_FIELD(pointer, init), /* pointer to a function */
-	DUMP_FIELD(pointer, job), /* pointer to a function */
+	DUMP_HEADER_SIZE("wrc_task_usage", sizeof(struct wrc_task_usage)),
 	DUMP_FIELD(unsigned_long, nrun),
 	DUMP_FIELD(unsigned_long, seconds),
 	DUMP_FIELD(unsigned_long, nanos),

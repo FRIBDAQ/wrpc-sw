@@ -45,6 +45,7 @@
 #include "dev/temp-w1.h"
 #include "dev/temperature.h"
 #include "sensors.h"
+#include "tasks.h"
 
 #include "board.h"
 #include <hw/timecode_regs.h>
@@ -81,8 +82,8 @@ const struct wrc_global wrc_global = {
 	.magic = WRC_G_MAGIC,
 	.version = WRC_G_VERSION,
 	.global_link = &wrc_global_link,
-	.task_list_max = WRC_MAX_TASKS,
-	.task_list = tasks,
+	.task_list_max = 0,
+	.task_list = NULL,
 	.temp_group_list_max = WRC_MAX_TEMPERATURES,
 #ifdef CONFIG_TEMP_SENSORS
 	.temp_group_list = temp_sensors,
@@ -183,12 +184,12 @@ static void wrc_initialize(void)
 	wrc_tasks_accounting_init();
 }
 
-static int is_link_up(void)
+int is_link_up(void)
 {
 	return link_status == NETIF_LINK_UP;
 }
 
-static int wrc_check_link(void)
+int wrc_check_link(void)
 {
 	static int prev_state = 0;
 	int state = ep_link_up( &wrc_endpoint_dev, NULL);
@@ -217,7 +218,7 @@ static int wrc_check_link(void)
 	return rv;
 }
 
-static int ui_update(void)
+int ui_update(void)
 {
 	return shell_interactive();
 }
@@ -233,12 +234,12 @@ void init_hw_after_reset(void)
 
 /* count uptime, in seconds, for remote polling */
 static uint32_t uptime_lastj;
-static void init_uptime(void)
+void init_uptime(void)
 {
 	uptime_lastj = timer_get_tics();
 }
 
-static int update_uptime(void)
+int update_uptime(void)
 {
 	extern uint32_t uptime_sec;
 	uint32_t j;
@@ -255,87 +256,10 @@ static int update_uptime(void)
 	return 0;
 }
 
-static void create_tasks(void)
-{
-	struct wrc_task *t;
-
-	/* clear task table in case of a reset */
-	wrc_tasks_preinit();
-
-	/* create all other tasks */
-	wrc_task_create( "idle", NULL, NULL );
-	wrc_task_create( "check-link", NULL, wrc_check_link );
-	wrc_task_create( "uptime", init_uptime, update_uptime );
-	wrc_task_create( "ptp", NULL, wrc_ptp_update);
-	wrc_task_create( "ptp_bmc", NULL, wrc_ptp_bmc_update);
-	wrc_task_create( "shell+gui", shell_boot_script, ui_update );
-	wrc_task_create( "spll-bh", NULL, spll_update );
-
-	if (HAS_TEMP_SENSORS)
-		wrc_task_create("temperature", NULL, wrc_temp_refresh);
-
-	t = wrc_task_create( "net-bh", NULL, net_bh_poll );
-	wrc_task_set_enable( t, is_link_up );
-
-#ifdef CONFIG_DAC_LOG
-	wrc_task_create( "dac-logger", daclog_init, daclog_poll );
-#endif
-
-#ifdef CONFIG_IP
-	t = wrc_task_create( "arp", arp_init, arp_poll );
-	wrc_task_set_enable( t, is_link_up );
-	/* Run ipv4 even if link is down. ipv4_poll has to be executed even
-	 * on link down to trigger the bootp request when the link is up.
-	 * Needed by syslog to track link up */
-	wrc_task_create( "ipv4", ipv4_init, ipv4_poll );
-#endif
-
-#ifdef CONFIG_LATENCY_PROBE
-	wrc_task_create( "latency-probe", latency_init, latency_poll );
-#endif
-
-#ifdef CONFIG_LLDP
-	t = wrc_task_create( "lldp", lldp_init, lldp_poll );
-	wrc_task_set_enable( t, is_link_up );
-#endif
-
-#ifdef CONFIG_SNMP
-	t = wrc_task_create( "snmp", snmp_init, snmp_poll );
-	wrc_task_set_enable( t, is_link_up );
-#endif
-
-	wrc_task_create( "stats", NULL, wrc_log_stats );
-
-#ifdef CONFIG_WR_DIAG
-	wrc_task_create( "diags", NULL, wrc_wr_diags );
-#endif
-
-#ifdef CONFIG_NETCONSOLE
-	t = wrc_task_create( "netconsole", netconsole_init, netconsole_poll );
-	wrc_task_set_enable( t, is_link_up );
-#endif
-
-#ifdef CONFIG_SFP_DOM
-	/* Read DOM data from SFP even if the link is down or/and SFP
-	 * unplugged */
-	wrc_task_create("sfp_dom", NULL, sfp_dom_update);
-#endif
-
-#ifndef CONFIG_LPDC_NONE
-	wrc_task_create("phy-cal", phy_calibration_init, phy_calibration_poll);
-#endif
-
-#ifdef CONFIG_AUX_TIMING_EN
-  wrc_task_create("timecode", NULL, timecode_update);
-#endif
-}
-
 int main(void) __attribute__ ((weak));
 int main(void)
 {
 	check_reset();
-	create_tasks();
-	wrc_board_create_tasks();
 
 	wrc_initialize();
 

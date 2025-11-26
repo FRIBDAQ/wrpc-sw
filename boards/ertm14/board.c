@@ -62,6 +62,7 @@
 #include "net.h"
 #include "wrpc.h"
 #include "shell.h"
+#include "tasks.h"
 
 #include "hw/wr_streamers.h"
 #include "wrc-event.h"
@@ -840,7 +841,7 @@ static void control_uart_mode_callback( int is_binary )
 static int ertm_process_psnmp(
 	struct uart_packet *rx_pkt, struct uart_packet *tx_pkt);
 
-static int control_uart_poll(void)
+int control_uart_poll(void)
 {
     struct uart_packet *pkt;
 
@@ -1199,12 +1200,12 @@ static void configure_spll_debug_dump( int enabled, int undersample )
     }
 }
 
-static void ertm14_spll_debug_dump_task_init(void)
+void ertm14_spll_debug_dump_task_init(void)
 {
     spll_dbg_enabled = 0;
 }
 
-static int ertm14_spll_debug_dump_task_poll(void)
+int ertm14_spll_debug_dump_task_poll(void)
 {
     struct uart_packet tx_pkt;
     struct ertm14_spll_debug_dump_data *tx_payload = (struct ertm14_spll_debug_dump_data *) &tx_pkt.payload;
@@ -1476,7 +1477,7 @@ static int ertm_process_psnmp(struct uart_packet *rx_pkt, struct uart_packet *tx
 
 static int evth_dds_nco_sync;
 
-static void ertm14_dds_nco_sync_init(void)
+void ertm14_dds_nco_sync_init(void)
 {
     ertm14_current_state->ref.sync_state = ERTM14_CLK_SYNC_STATE_RESTART;
     ertm14_current_state->lo.sync_state = ERTM14_CLK_SYNC_STATE_RESTART;
@@ -1635,7 +1636,7 @@ static int rf_nco_sync_fsm( int is_ref, struct ertm14_dds_state *state, uint32_t
     return 0;
 }
 
-static int ertm14_dds_nco_sync_task(void)
+int ertm14_dds_nco_sync_task(void)
 {
     int evt = event_poll( evth_dds_nco_sync );
 
@@ -1653,12 +1654,12 @@ static int evth_clkab_sync;
 
 static int clkab_sync_state;
 
-static void ertm14_clkab_sync_init(void)
+void ertm14_clkab_sync_init(void)
 {
     clkab_sync_state = CLKAB_SYNC_STATE_IDLE;
 }
 
-static int ertm14_clkab_sync_task(void)
+int ertm14_clkab_sync_task(void)
 {
     int evt = event_poll( evth_clkab_sync );
     ( void ) evt;
@@ -2657,17 +2658,17 @@ static int mmc_test_communication( struct ertm14_mmc_link *link, struct ertm14_m
     return 0;
 }
 
-static void mmc14_link_init(void)
+void mmc14_link_init(void)
 {
     tmo_init(&mmc14_link.poll_timeout, ERTM14_MMC_POLL_PERIOD_MS );
 }
 
-static void mmc15_link_init(void)
+void mmc15_link_init(void)
 {
     tmo_init(&mmc15_link.poll_timeout, ERTM14_MMC_POLL_PERIOD_MS );
 }
 
-static int mmc14_link_poll(void)
+int mmc14_link_poll(void)
 {
     if (tmo_expired(&mmc14_link.poll_timeout))
     {
@@ -2682,7 +2683,7 @@ static int mmc14_link_poll(void)
     return 0;
 }
 
-static int mmc15_link_poll(void)
+int mmc15_link_poll(void)
 {
     if (tmo_expired(&mmc15_link.poll_timeout))
     {
@@ -2734,7 +2735,7 @@ static void mmc_comm_init(void)
 
 static timeout_t rfmon_timeout;
 
-static void ertm15_init_rf_monitor( void )
+void ertm15_init_rf_monitor( void )
 {
     tmo_init( &rfmon_timeout, 2000 );
 }
@@ -2757,7 +2758,7 @@ static void ertm15_force_rf_power_measurement( void )
     ertm15_rf_distr_measure_power_restart( &board.rf_distr, 1 );
 }
 
-static int ertm15_update_rf_monitor( void )
+int ertm15_update_rf_monitor( void )
 {
     if( ertm15_rf_distr_is_pwrmon_idle( &board.rf_distr ) )
     {
@@ -2808,7 +2809,7 @@ static int wrc_ptp_get_state(void)
 	return ppi->state;
 }
 
-static int ertm14_update_leds( void )
+int ertm14_update_leds( void )
 {
     /* White Rabbit Servo */
     enum {
@@ -2953,6 +2954,11 @@ static int check_calibration_version(void)
     return -1;
 }
 
+int has_ertm15(void)
+{
+	return ! ( board.mode & ERTM14_MODE_WITHOUT_ERTM15 );
+}
+
 int wrc_board_init()
 {
     evth_dds_nco_sync = event_listener_create();
@@ -2960,32 +2966,10 @@ int wrc_board_init()
 
     console_set_mode_switch_hook( &console_uart_dev, control_uart_mode_callback );
 
-    wrc_task_create( "control-uart", NULL, control_uart_poll );
-    wrc_task_create( "mmc14", mmc14_link_init, mmc14_link_poll );
-    wrc_task_create( "leds", NULL, ertm14_update_leds );
-
-    if( ! ( board.mode & ERTM14_MODE_WITHOUT_ERTM15 ) )
-    {
-        wrc_task_create( "rf-nco-sync", ertm14_dds_nco_sync_init, ertm14_dds_nco_sync_task );
-        wrc_task_create( "clkab-sync", ertm14_clkab_sync_init, ertm14_clkab_sync_task );
-        wrc_task_create( "mmc15", mmc15_link_init, mmc15_link_poll );
-        wrc_task_create( "rf-monitor", ertm15_init_rf_monitor, ertm15_update_rf_monitor );
-    }
-
-    wrc_task_create( "spll-dbg", ertm14_spll_debug_dump_task_init, ertm14_spll_debug_dump_task_poll );
-
     struct ertm14_board_state mask;
     memset(&mask, 0xff, sizeof( struct ertm14_board_state )); // make sure we commit everything to HW
 
     ertm14_apply_config( ertm14_current_state, &mask, 1 );
-
-    return 0;
-}
-
-
-int wrc_board_create_tasks()
-{
-    wrc_task_create("events-ptp", wrc_events_ptp_init, wrc_events_ptp_poll);
 
     return 0;
 }
