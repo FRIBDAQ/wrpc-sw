@@ -99,9 +99,11 @@ static int bootp_poll(void)
 	/* Read received packet (if any) */
 	len = ptpd_netif_recvfrom(bootp_socket, &addr, buf, sizeof(buf), NULL);
 
-	/* Check and update the next time, even if not used.
-	   If not updated, the next time can be way in the future, which
-	   will block bootp if the link goes down and up. */
+	/* Check and update the next time (bootp_tics), even if not used.
+	   If not updated, the function time_before used in the
+	   wrc_task_not_yet may not work as expected because the value of
+	   bootp_tics is too much off from current ticks reading. It may
+	   then block bootp if the link goes down and up at some point. */
 	not_yet = wrc_task_not_yet(&bootp_tics, TICS_PER_SECOND);
 
 	/* Nothing to do if there is an IP address */
