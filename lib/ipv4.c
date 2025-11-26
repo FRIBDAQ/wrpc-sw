@@ -94,9 +94,19 @@ static int bootp_poll(void)
 	struct wr_sockaddr addr;
 	uint8_t buf[400];
 	int len, ret = 0;
+	int not_yet;
 
+	/* Read received packet (if any) */
 	len = ptpd_netif_recvfrom(bootp_socket, &addr, buf, sizeof(buf), NULL);
 
+	/* Check and update the next time (bootp_tics), even if not used.
+	   If not updated, the function time_before used in the
+	   wrc_task_not_yet may not work as expected because the value of
+	   bootp_tics is too much off from current ticks reading. It may
+	   then block bootp if the link goes down and up at some point. */
+	not_yet = wrc_task_not_yet(&bootp_tics, TICS_PER_SECOND);
+
+	/* Nothing to do if there is an IP address */
 	if (ip_status != IP_TRAINING)
 		return 0;
 
@@ -104,12 +114,15 @@ static int bootp_poll(void)
 	if (HAS_ABSCAL && wrc_ptp_is_abscal())
 		return 0;
 
+	/* Process reply */
 	if (len > 0)
 		ret = process_bootp(buf, len);
 
-	if (wrc_task_not_yet(&bootp_tics, TICS_PER_SECOND))
+	/* Wait for next time before sending a request */
+	if (not_yet)
 		return ret;
 
+	/* Send a request */
 	len = prepare_bootp(&addr, buf, ++bootp_retry);
 	ptpd_netif_sendto(bootp_socket, &addr, buf, len, 0);
 	return 1;
