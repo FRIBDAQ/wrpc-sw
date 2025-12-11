@@ -30,13 +30,13 @@
 /* Slave mode - 125 MHz reference locked to one of the input clocks */
 #define SPLL_MODE_SLAVE 3
 
-#define SEQ_DISABLED 0
-#define SEQ_CLEAR_DACS 1
-#define SEQ_WAIT_CLEAR_DACS 2
-#define SEQ_WAIT_EXT 3
+#define SEQ_DISABLED 7
+#define SEQ_CLEAR_DACS 9
+#define SEQ_WAIT_CLEAR_DACS 10
+#define SEQ_WAIT_EXT 2
 #define SEQ_WAIT_HELPER 4
-#define SEQ_WAIT_MAIN 5
-#define SEQ_READY 6
+#define SEQ_WAIT_MAIN 6
+#define SEQ_READY 8
 
 #define AUX_DISABLED 1
 #define AUX_LOCK_PLL 2
