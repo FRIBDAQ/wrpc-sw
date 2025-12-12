@@ -166,10 +166,11 @@ static inline void sequencing_fsm(struct softpll_state *s, int tag_value, int ta
 		}
 
 		case SEQ_WAIT_HELPER:
+#ifndef CONFIG_IGNORE_HPLL
 			/* Wait until helper pll is locked */
 			if (!(s->helper.ld.locked && s->helper.ld.lock_changed))
 				break;
-
+#endif
 			if (s->mode == SPLL_MODE_SLAVE) {
 				/* Start main pll */
 				mpll_start(&s->mpll);
