@@ -21,7 +21,13 @@
 #include "netconsole.h"
 #include "lib/syslog.h"
 
-static struct console_device* console_devs[BOARD_CONSOLE_DEVICES + 1 + HAS_NETCONSOLE + HAS_PUTS_SYSLOG];
+/* Default: no extra consoles */
+#ifndef BOARD_EXTRA_CONSOLES
+#define BOARD_EXTRA_CONSOLES 0
+#endif
+
+/* 2 consoles (uart + vuart) are always registered */
+static struct console_device* console_devs[2 + BOARD_EXTRA_CONSOLES + HAS_NETCONSOLE + HAS_PUTS_SYSLOG];
 
 void console_register_device( struct console_device *dev )
 {
