@@ -384,6 +384,7 @@ void spll_init(int mode, int slave_ref_channel, int flags)
 	}
 
 
+#if 0
 	/* Purge debug queue */
 	if ( SPLL->CSR & SPLL_CSR_DBG_SUPPORTED )
 	{
@@ -393,6 +394,7 @@ void spll_init(int mode, int slave_ref_channel, int flags)
 			(void) dummy;
 		}
 	}
+#endif
 
 	if(mode == SPLL_MODE_DISABLED)
 		return;
@@ -922,6 +924,8 @@ void spll_set_pi_gain_kp_ki(int loop, int kp, int ki)
 	enable_irq();
 }
 
+#if 0
+
 static struct spll_debug_queue_state
 {
 	int undersample_ratio;
@@ -949,7 +953,6 @@ void spll_debug_queue_configure( int undersample, int coalsesce_threshold )
 		dbg_state.undersample_pass[i] = 0;
 		}
 }
-
 
 int spll_get_debug_queue_samples( uint32_t *buf, int *count )
 {
@@ -1003,6 +1006,7 @@ int spll_get_debug_queue_samples( uint32_t *buf, int *count )
 
 	return 0;
 }
+#endif
 
 void spll_set_aux_mode( int channel, int mode )
 {
