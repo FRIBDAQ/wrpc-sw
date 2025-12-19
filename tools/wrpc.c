@@ -1549,6 +1549,7 @@ static void help_vuart(void)
 {
 	fprintf(stderr, "usage: %s vuart BOARD-OPTIONS [-k] [-c <cmd>] [-r] [-t <timeout>]\n", progname);
 	fprintf(stderr, " -k keep terminal\n");
+	fprintf(stderr, " -d debug\n");
 	fprintf(stderr, " -c <cmd> execute command\n");
 	fprintf(stderr, " -t <timeout> set a timeout to execute a command\n");
 	fprintf(stderr, " -r do not expect stdin (may be useful for scripts),"
@@ -1766,6 +1767,29 @@ static void wrpc_vuart_only_read(struct board *board,
 	}
 }
 
+static void wrpc_vuart_debug(struct board *board)
+{
+	int print = 1;
+
+	while(1) {
+		int rdr = vuart_readl(board, UART_REG_HOST_RDR );
+		unsigned char c = rdr & 0xff;
+		int rdy = rdr & UART_HOST_RDR_RDY;
+
+		if (rdy || print) {
+			printf("rdr: %08x (data:%02x '%c' rdy:%u count: %u)\n",
+			       rdr,
+			       c, c >= ' ' && c < 127 ? c : ' ',
+			       rdy ? 1 : 0,
+			       (rdr & UART_HOST_RDR_COUNT_MASK)
+			         >> UART_HOST_RDR_COUNT_SHIFT);
+			print = rdy;
+		}
+		else
+			usleep(1000);
+	}
+}
+
 static void wrpc_vuart_command(struct board *board, char *command)
 {
 	//above is place for old and new port settings for keyboard teletype
@@ -1828,12 +1852,13 @@ static int do_vuart(int argc, char *argv[])
 	char *cmd = NULL;
         unsigned timeout = 0;
 	int read_only = 0;
+	int debug = 0;
 
 	if (board_open(&argc, argv) < 0)
 		return 1;
 
 	/* Parse specific args */
-	while ((c = getopt (argc, argv, "c:kt:r")) != -1) {
+	while ((c = getopt (argc, argv, "c:kt:rd")) != -1) {
 		switch (c) {
 		case 'c':
 			/* Enable command mode */
@@ -1848,13 +1873,16 @@ static int do_vuart(int argc, char *argv[])
 		case 'r':
 			read_only = 1;
                         break;
+		case 'd':
+			debug = 1;
+			break;
 		case '?':
 			break;
 		}
 	}
 
-	if (cmd && read_only) {
-		perror("-r conficts with -c\n");
+	if ((cmd != NULL) + read_only + debug > 1) {
+		perror("Only one of -r, -c, -d can be used\n");
 		return 1;
 	}
 
@@ -1862,6 +1890,8 @@ static int do_vuart(int argc, char *argv[])
 		wrpc_vuart_only_read(board, timeout);
 	else if (cmd)
 		wrpc_vuart_command(board, cmd);
+	else if (debug)
+		wrpc_vuart_debug(board);
 	else
 		wrpc_vuart_term(board, keep_term, timeout);
 
