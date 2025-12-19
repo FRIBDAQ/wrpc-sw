@@ -2204,26 +2204,46 @@ static void spll_readout_direct(struct board* board )
 	}
 }
 
+static void spll_debug_direct(struct board* board)
+{
+	unsigned csr_addr = OFFSET_SOFTPLL + SPLL_HOST_MAP_DFR_HOST_CSR;
+	unsigned data_addr = OFFSET_SOFTPLL + SPLL_HOST_MAP_DFR_HOST_R0;
+
+	while (1) {
+		uint32_t r = board->readl(board, csr_addr);
+		unsigned empty = (r & SPLL_HOST_MAP_DFR_HOST_CSR_EMPTY) != 0;
+		printf ("csr (@0x%04x): %08x empty:%u\n",
+			csr_addr, (unsigned)r, empty);
+		if (empty)
+			break;
+
+		r = board->readl(board, data_addr);
+		printf ("data (@0x%04x): %08x\n", data_addr, (unsigned)r);
+	}
+}
 
 static int do_spll_recorder(int argc, char *argv[])
 {
-	int is_ertm = 0;
+	int is_ertm;
 	int c;
 	int undersample __attribute__((unused)) = 20;
+	int debug = 0;
 
 
 	if (board_open(&argc, argv) < 0)
 		return 1;
 
 	/* Parse specific args */
-	while ((c = getopt (argc, argv, "u:h")) != -1) {
+	while ((c = getopt (argc, argv, "u:hd")) != -1) {
 		switch (c) {
 		case 'u':
-			/* Enable command mode */
 			undersample = atoi(optarg);
 			break;
 		case 'h':
 			help_spll_recorder();
+			break;
+		case 'd':
+			debug = 1;
 			break;
 		case '?':
 		default:
@@ -2241,10 +2261,10 @@ static int do_spll_recorder(int argc, char *argv[])
 		spll_readout_ertm14( (struct board_ertm14*) board, undersample );
 #endif
 	}
+	else if (debug)
+		spll_debug_direct(board);
 	else
-	{
-		spll_readout_direct( (struct board*) board );
-	}
+		spll_readout_direct(board);
 
 	board->fini(board);
 
