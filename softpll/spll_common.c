@@ -126,93 +126,86 @@ void spll_enable_tagger(int channel, int enable)
 	pll_verbose("%s: ch %d, OCER 0x%x, RCER 0x%x\n", __FUNCTION__, channel, SPLL->OCER, SPLL->RCER);
 }
 
-#if 0
+#ifdef BOARD_SPLL_DEBUG_QUEUE
+
+/* Depth of the SW fifo */
+#define DEBUG_QUEUE_SIZE 1024
 
 static struct spll_debug_queue_state
 {
-	int undersample_ratio;
-	uint8_t undersample_count[SPLL_DBG_MAX_SOURCES];
-	uint8_t undersample_pass[SPLL_DBG_MAX_SOURCES];
-	int coalesce_threshold;
+	/* Undersampling.  Keep only 1 entry every RATIO for each source */
+	unsigned undersample_ratio;
+	/* Counter for undersampling.  Only store when the count is 0 */
+	unsigned undersample_count;
+	/* Do not return less than this threshold */
+	unsigned coalesce_threshold;
+	/* The memory.  */
+	uint32_t queue[DEBUG_QUEUE_SIZE];
+	unsigned count;
+	unsigned head;
 } dbg_state;
 
 
 void spll_debug_queue_configure(int undersample, int coalsesce_threshold)
 {
-	int dummy, i;
-	while (!(SPLL->DFR_HOST_CSR & SPLL_DFR_HOST_CSR_EMPTY))
-		{
-			dummy = SPLL->DFR_HOST_R0;
-			(void) dummy;
-		}
-
+	/* Set values */
 	dbg_state.undersample_ratio = undersample;
-	dbg_state.coalesce_threshold = coalsesce_threshold * undersample;
+	dbg_state.coalesce_threshold = coalsesce_threshold;
 
-	for(i=0;i<SPLL_DBG_MAX_SOURCES;i++)
-	{
-		dbg_state.undersample_count[i] = 0;
-		dbg_state.undersample_pass[i] = 0;
-	}
+	/* Reinitialize */
+	dbg_state.undersample_count = 0;
+	dbg_state.count = 0;
+	dbg_state.head = 0;
 }
 
-int spll_get_debug_queue_samples(uint32_t *buf, int *count)
+int spll_get_debug_queue_samples(uint32_t *buf, unsigned max_count)
 {
-	int n_ents = 0;
-	int latch_full = SPLL->DFR_HOST_CSR & SPLL_DFR_HOST_CSR_FULL;
-	int latch_count = SPLL_DFR_HOST_CSR_USEDW_R(SPLL->DFR_HOST_CSR);
+	int res = 0;
 	struct spll_debug_queue_state *st = &dbg_state;
 
 	/* Return now if not enough samples.  */
-	if( !latch_full && latch_count < dbg_state.coalesce_threshold )
-	{
-		*count = 0;
+	if( st->count < st->coalesce_threshold )
 		return 0;
-	}
 
 	while(1)
 	{
-		if ( SPLL->DFR_HOST_CSR & SPLL_DFR_HOST_CSR_EMPTY )
+		if(st->count == 0 || res == max_count)
 			break;
 
-		if( n_ents == *count )
-			break;
-
-		volatile uint32_t v = SPLL->DFR_HOST_R0;
-		int signal = SPLL_DBG_EXTRACT_SIGNAL( v );
-		int src = SPLL_DBG_EXTRACT_SOURCE( v );
-
-		if(st->undersample_pass[src] || signal == SPLL_DBG_SIGNAL_EVENT )
-		{
-			*buf++ = v;
-			n_ents ++;
-		}
-
-		if( v & 0x80000000 ) // last entry in the record
-		{
-			st->undersample_count[src]++;
-			if (st->undersample_count[src] >= st->undersample_ratio)
-			{
-				st->undersample_count[src] = 0;
-				st->undersample_pass[src] = 1;
-			} else {
-				st->undersample_pass[src] = 0;
-			}
-		}
-
+		*buf++ = st->queue[st->head];
+		st->count--;
+		st->head = (st->head + 1) % DEBUG_QUEUE_SIZE;
+		res++;
 	}
 
-	*count = n_ents;
-
-	if( latch_full )
-		return -ENOSPC;
-
-	return 0;
+	return res;
 }
 #endif
 
-void spll_debug(int src, int what, int value, int last)
+void spll_debug(int src, int signal, int value, int last)
 {
-	uint32_t w = (last ? 0x80000000 : 0) | (value & 0xffffff) | (src << 28) | (what << 24);
+	uint32_t w = (last ? 0x80000000 : 0) | (value & 0xffffff) | (src << 28) | (signal << 24);
+
+#ifdef BOARD_SPLL_DEBUG_QUEUE
+	/* Push to SW fifo */
+	struct spll_debug_queue_state *st = &dbg_state;
+	if (signal == SPLL_DBG_SIGNAL_EVENT
+	    || st->undersample_count == 0) {
+		/* Keep */
+		if (st->count < DEBUG_QUEUE_SIZE) {
+			unsigned ptr;
+			ptr = (st->head + st->count) % DEBUG_QUEUE_SIZE;
+			st->queue[ptr] = w;
+			st->count++;
+		}
+	}
+	if (last) {
+		st->undersample_count++;
+		if (st->undersample_count >= st->undersample_ratio)
+			st->undersample_count = 0;
+	}
+#else
+	/* Push to HW fifo */
 	SPLL->DFR_SPLL = w;
+#endif
 }

@@ -63,6 +63,9 @@
 /* Socket buffer size, determines the max. RX packet size */
 #define NET_MAX_SKBUF_SIZE 512
 
+/* Enable SW SPLL fifo */
+#define BOARD_SPLL_DEBUG_QUEUE 1
+
 /* spll parameter that are board-specific */
 #  define BOARD_DIVIDE_DMTD_CLOCKS	0
 #  define NS_PER_CLOCK 16
