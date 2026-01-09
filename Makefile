@@ -109,7 +109,7 @@ obj-$(CONFIG_EMBEDDED_NODE) += \
 
 archflags-$(CONFIG_ARCH_LM32) = -mmultiply-enabled -mbarrel-shift-enabled
 archflags-$(CONFIG_ARCH_RISCV) = -march=rv32im$(USE-COMP-INSTR-y) -mabi=ilp32
-archflags-$(CONFIG_ARCH_ARM_R5) = -mfloat-abi=hard -mfpu=vfpv3-d16 -march=armv7-r+fp -mthumb -mtune=cortex-r5
+archflags-$(CONFIG_ARCH_ARM_R5) = -mfloat-abi=hard -mfpu=vfpv3-d16 -march=armv7-r+fp -mthumb -mtune=cortex-r5 -mno-unaligned-access
 
 # Note: RISC-V is special as it needs extra -march flags for the assembler in
 #  order to allow system instructions
