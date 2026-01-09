@@ -16,13 +16,16 @@ static inline void clear_irq(void) {
     asm volatile ("csrrc %0, mip, %1" : "=r"(t) : "r"(1 << 11));
 }
 
-#else
+#elif defined(CONFIG_ARCH_LM32)
 static inline void clear_irq(void)
 {
 	unsigned int val = 1;
 	asm volatile ("wcsr ip, %0"::"r" (val));
 }
-
+#elif defined(CONFIG_ARCH_ARM_R5)
+extern void clear_irq(void);
+#else
+#warning "unhandled architecture in irq.h"
 #endif
 
 void disable_irq(void);
