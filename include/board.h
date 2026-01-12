@@ -19,6 +19,7 @@
 #elif defined CONFIG_ARCH_ARM_R5
     /* Very board specific */
     #define DEV_BASE	0x80003000
+    #define BASE_AUXWB	0x80004000
 #else
     #error Wrong CPU architecture. Must define either LM32 or RISC-V.
 #endif
@@ -35,7 +36,9 @@
 #define BASE_TIMECODE           (DEV_BASE + 0x700)
 #define BASE_WDIAGS_PRIV        (DEV_BASE + 0x900)
 #define BASE_CLOCK_MONITOR      (DEV_BASE + 0xa00)
+#ifndef BASE_AUXWB
 #define BASE_AUXWB              (DEV_BASE + 0x8000)
+#endif
 
 /* Board configuration. */
 #if defined(CONFIG_TARGET_GENERIC_PHY_8BIT) || defined(CONFIG_TARGET_GENERIC_PHY_16BIT) || defined(CONFIG_TARGET_SPEC_SILABS)

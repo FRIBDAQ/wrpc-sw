@@ -7,7 +7,8 @@ MEMORY
   ocm : ORIGIN = 0xfffc0000, LENGTH = 0x10000
 }
 
-_STACK_SIZE = 0x1000;
+_STACK_SIZE = 0x800;
+_IRQ_STACK_SIZE = 0x200;
 
 SECTIONS
 {
@@ -30,6 +31,10 @@ SECTIONS
        _stack_end = .;
        . += _STACK_SIZE;
        __stack = .;
+       . = ALIGN(16);
+       _irq_stack_end = .;
+       . += _IRQ_STACK_SIZE;
+       __irq_stack = .;
      } > ocm
      
 }

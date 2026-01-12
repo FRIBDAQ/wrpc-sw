@@ -5,9 +5,9 @@ _reset_vector:
 	b . /* 0x4  Undefined Instruction */
 	b . /* 0x8  Software Interrupt */
 	b . /* 0xC  Prefetch Abort */
-	b . /* 0x10 Data Abort */
+	b .	/* _data_abort_handler *//* 0x10 Data Abort */
 	b . /* 0x14 Reserved */
-	b . /* 0x18 IRQ */
+	b	_irq_handler /* 0x18 IRQ */
 	b . /* 0x1C FIQ */
 
 
@@ -34,6 +34,11 @@ _boot:
 	mrs	r0, cpsr		/* get the current PSR */
 	mvn	r1, #0x1f		/* set up the irq stack pointer */
 	and	r0, r1, r0
+
+	orr	r2, r0, #0x12		/* IRQ mode */
+	msr	cpsr, r2
+	ldr	r13,=__irq_stack	/* IRQ stack pointer */
+	mov 	r14,#0
 
 	/* TODO: other modes */
 
@@ -112,11 +117,8 @@ _boot:
 	mcr 	p15, 0, r0, c15, c5, 0      	/* Invalidate entire data cache*/
 	isb
 
-#if 0
-init:
-	bl 	Init_MPU		/* Initialize MPU */
-#endif
-	
+	bl 	_init_mpu		/* Initialize MPU */
+
 #if 0
 	/* Copy vectors */
 	ldr	r0,=_vector_table
@@ -128,7 +130,7 @@ init:
 	cmp	r0, r4
 	bls	0b
 #endif
-	
+
 	/* Enable Branch prediction */
 	mrc     p15, 0, r0, c1, c0, 1       /* Read ACTLR*/
         bic     r0, r0, #(0x1 << 17)        /* Clear RSDIS bit 17 to enable return stack*/
@@ -137,7 +139,6 @@ init:
         orr	r0, r0, #(0x1 << 14)	    /* Disable DBWR for errata 780125 */
 	mcr     p15, 0, r0, c1, c0, 1       /* Write ACTLR*/
 
-#if 0
 	/* Enable MPU, icache and dcache */
 	mrc 	p15,0,r1,c1,c0,0
 	ldr	r0, =0x1005
@@ -145,7 +146,6 @@ init:
 	dsb
 	mcr	p15,0,r1,c1,c0,0		/* Enable cache  */
 	isb					/* isb	flush prefetch buffer */
-#endif
 
 #if 0
 	/* enable asynchronous abort exception */
@@ -160,7 +160,7 @@ init:
 
 	bl	map_tcm
 #endif
-	
+
 	/* Clear BSS */
 	mov	r0, #0
 
@@ -179,7 +179,20 @@ init:
 	ldr r1, [r3]
 	add r1, r1, #1
 	str r1, [r3]
-	
+
 	bl	main			/* Jump to main C code */
 
 
+.text
+_irq_handler:
+	stmdb	sp!,{r0-r3,r12,lr}
+	bl	spll_irq_entry			/* IRQ vector */
+	ldmia	sp!,{r0-r3,r12,lr}
+	subs	pc, lr, #4			/* adjust return */
+
+_data_abort_handler:
+	stmdb	sp!,{r0-r3,r12,lr}
+	sub     r0, lr, #8
+	bl	DataAbortInterrupt
+	ldmia	sp!,{r0-r3,r12,lr}
+	subs	pc, lr, #8			/* adjust return */
