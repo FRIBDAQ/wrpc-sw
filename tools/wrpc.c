@@ -3968,6 +3968,306 @@ static int do_aux_logger(int argc, char *argv[])
 	return 0;
 }
 
+/**
+ * RPU Base Address
+ */
+#define RPU_BASEADDR      0xff9a0000u
+
+/**
+ * Register: RPU_RPU_GLBL_CNTL
+ */
+#define RPU_RPU_GLBL_CNTL    0x00000000u
+#define RPU_RPU_GLBL_CNTL_SLSPLIT_MASK    0x00000008u
+#define RPU_RPU_GLBL_CNTL_TCM_COMB_MASK   0x00000040u
+#define RPU_RPU_GLBL_CNTL_SLCLAMP_MASK    0x00000010u
+
+/**
+ * Register: RPU_RPU_0_CFG
+ */
+#define RPU_RPU_0_CFG    0X00000100U
+#define RPU_RPU_0_CFG_VINITHI_MASK     0x00000004U
+#define RPU_RPU_0_CFG_NCPUHALT_MASK    0X00000001U
+#define RPU_RPU_0_STATUS	0X00000104U
+
+/**
+ * Register: RPU_RPU_1_CFG
+ */
+#define RPU_RPU_1_CFG    0X00000200U
+#define RPU_RPU_1_CFG_VINITHI_MASK     0x00000004U
+#define RPU_RPU_1_CFG_NCPUHALT_MASK    0X00000001U
+#define RPU_RPU_1_STATUS	0X00000204U
+
+/**
+ * CRL_APB Base Address
+ */
+#define CRL_APB_BASEADDR      0xff5e0000u
+
+/**
+ * Register: CRL_APB_CPU_R5_CTRL
+ */
+#define CRL_APB_CPU_R5_CTRL    0X00000090U
+#define CRL_APB_CPU_R5_CTRL_CLKACT_MASK    0X01000000U
+
+/**
+ * Register: CRL_APB_RST_LPD_TOP
+ */
+#define CRL_APB_RST_LPD_TOP    0X0000023CU
+#define CRL_APB_RST_LPD_TOP_RPU_R50_RESET_MASK    (u32)0X00000001U
+#define CRL_APB_RST_LPD_TOP_RPU_AMBA_RESET_MASK    (u32)0X00000004U
+#define CRL_APB_RST_LPD_TOP_RPU_R51_RESET_MASK    (u32)0X00000002U
+
+/**
+ * PMU_GLOBAL Base Address
+ */
+#define PMU_GLOBAL_BASEADDR      0XFFD80000U
+
+/* Register: PMU_GLOBAL_REQ_PWRUP_INT_EN */
+#define PMU_GLOBAL_REQ_PWRUP_INT_EN    0X00000118U
+#define PMU_GLOBAL_REQ_PWRUP_INT_EN_PL_MASK    0X00800000U
+
+/* Register: PMU_GLOBAL_REQ_PWRUP_TRIG */
+#define PMU_GLOBAL_REQ_PWRUP_TRIG    0X00000120U
+#define PMU_GLOBAL_REQ_PWRUP_TRIG_PL_MASK    0X00800000U
+
+/* Register: PMU_GLOBAL_REQ_PWRUP_STATUS */
+#define PMU_GLOBAL_REQ_PWRUP_STATUS    0X00000110U
+#define PMU_GLOBAL_REQ_PWRUP_STATUS_PL_SHIFT   23U
+#define PMU_GLOBAL_REQ_PWRUP_STATUS_PL_MASK    0X00800000U
+
+/* Register: PMU_GLOBAL_PWR_STATE */
+#define PMU_GLOBAL_PWR_STATE    0X00000100U
+#define PMU_GLOBAL_PWR_STATE_PL_MASK  		0X00800000U
+#define PMU_GLOBAL_PWR_STATE_FP_MASK    	0X00400000U
+#define PMU_GLOBAL_PWR_STATE_USB1_MASK    	0X00200000U
+#define PMU_GLOBAL_PWR_STATE_USB0_MASK    	0X00100000U
+#define PMU_GLOBAL_PWR_STATE_OCM_BANK3_MASK    	0X00080000U
+#define PMU_GLOBAL_PWR_STATE_OCM_BANK2_MASK    	0X00040000U
+#define PMU_GLOBAL_PWR_STATE_OCM_BANK1_MASK    	0X00020000U
+#define PMU_GLOBAL_PWR_STATE_OCM_BANK0_MASK    	0X00010000U
+#define PMU_GLOBAL_PWR_STATE_TCM1B_MASK    	0X00008000U
+#define PMU_GLOBAL_PWR_STATE_TCM1A_MASK    	0X00004000U
+#define PMU_GLOBAL_PWR_STATE_TCM0B_MASK    	0X00002000U
+#define PMU_GLOBAL_PWR_STATE_TCM0A_MASK    	0X00001000U
+#define PMU_GLOBAL_PWR_STATE_R5_1_MASK    	0X00000800U
+#define PMU_GLOBAL_PWR_STATE_R5_0_MASK    	0X00000400U
+#define PMU_GLOBAL_PWR_STATE_L2_BANK0_MASK    	0X00000080U
+#define PMU_GLOBAL_PWR_STATE_PP1_MASK    	0X00000020U
+#define PMU_GLOBAL_PWR_STATE_PP0_MASK    	0X00000010U
+#define PMU_GLOBAL_PWR_STATE_ACPU3_MASK    	0X00000008U
+#define PMU_GLOBAL_PWR_STATE_ACPU2_MASK    	0X00000004U
+#define PMU_GLOBAL_PWR_STATE_ACPU1_MASK    	0X00000002U
+#define PMU_GLOBAL_PWR_STATE_ACPU0_MASK    	0X00000001U
+
+#define ATCM0_ADDRESS 0xFFE00000
+#define BTCM0_ADDRESS 0xFFE20000
+#define ATCM1_ADDRESS 0xFFE90000
+#define BTCM1_ADDRESS 0xFFEB0000
+#define OCM_ADDRESS 0xFFFC0000
+
+struct rpu_sram_map_t {
+	unsigned vaddr;
+	unsigned paddr;
+	unsigned len;
+};
+static const struct rpu_sram_map_t rpu_sram_map[] = {
+	{0x00000000, ATCM0_ADDRESS, 0x10000 },
+	{0x00020000, BTCM0_ADDRESS, 0x10000 },
+	{0xfffc0000, OCM_ADDRESS, 0x10000 },
+	{0x00000000, 0,0 },
+};
+
+struct rpu_load_data {
+	int devmem_fd;
+	unsigned char *map;
+	unsigned vaddr;
+	unsigned len;
+};
+
+static int elf_rpu_load_cb (void *data, unsigned char *buf,
+			    unsigned len, unsigned vaddr)
+{
+	struct rpu_load_data *d = (struct rpu_load_data *)data;
+
+	while (len > 0) {
+		if (vaddr < d->vaddr || vaddr >= d->vaddr + d->len) {
+			/* Not within the mapped area */
+			if (d->map != NULL)
+				munmap(d->map, d->len);
+			const struct rpu_sram_map_t *map;
+			for (map = rpu_sram_map; map->len; map++)
+				if (vaddr >= map->vaddr
+				    && vaddr < map->vaddr + map->len)
+					break;
+			if (map->len == 0) {
+				printf ("rpu load: no vaddr 0x%08x\n",
+					vaddr);
+				return -1;
+			}
+			d->map = mmap(NULL, map->len, PROT_READ | PROT_WRITE,
+				      MAP_SHARED, d->devmem_fd, map->paddr);
+			if (d->map == MAP_FAILED) {
+				printf("rpu load: cannot map 0x%08x: %m\n",
+				       map->paddr);
+				return -1;
+			}
+			d->vaddr = map->vaddr;
+			d->len = map->len;
+		}
+
+		printf("load at 0x%08x (up to 0x%08x)\n", vaddr, len);
+
+		while (len > 0 && vaddr < d->vaddr + d->len) {
+			d->map[vaddr - d->vaddr] = *buf++;
+			vaddr++;
+			len--;
+		}
+	}
+	return 0;
+}
+
+static int dump_tcm(int fd, unsigned addr)
+{
+	void *tcm;
+	tcm = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, addr);
+	if (tcm == MAP_FAILED) {
+		printf("cannot mmap tcm: %m\n");
+		return 0;
+	}
+	for (unsigned i = 0; i < 256; i += 4) {
+		if (i % 16 == 0)
+			printf("%08x:", i);
+		printf(" %08x", *(unsigned *)(tcm + i));
+		if (i % 16 == 12)
+			printf("\n");
+	}
+	munmap(tcm, 0x1000);
+	return 0;
+}
+
+static int clear_tcm(int fd, const struct rpu_sram_map_t *map)
+{
+	void *tcm;
+	volatile double *d;
+
+	tcm = mmap(NULL, map->len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map->paddr);
+	if (tcm == MAP_FAILED) {
+		printf("cannot mmap tcm: %m\n");
+		return 0;
+	}
+
+	d = (volatile double *)tcm;
+	for (unsigned i = 0; i < map->len; i += sizeof(double))
+		d[i / sizeof(double)] = 0.0;
+	munmap(tcm, map->len);
+	return 0;
+}
+
+static void help_zynqmp_rpu(void)
+{
+	printf("usage: %s zynqmp-rpu\n", progname);
+}
+
+static int do_zynqmp_rpu(int argc, char *argv[])
+{
+	int fd;
+	void *rpu_map;
+	void *crl_map;
+
+	fd = open("/dev/mem", O_RDWR | O_SYNC);
+	if (fd < 0) {
+		fprintf(stderr, "cannot open /dev/mem: %s\n",
+			strerror(errno));
+		return -1;
+	}
+
+	rpu_map = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE,
+		   MAP_SHARED, fd, RPU_BASEADDR);
+
+	crl_map = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE,
+		   MAP_SHARED, fd, CRL_APB_BASEADDR);
+
+	/* Do not try to map PMU, it is probably in the secure part */
+
+	if (rpu_map == MAP_FAILED || crl_map == MAP_FAILED) {
+		fprintf(stderr, "cannot map /dev/mem: %s\n",
+			strerror(errno));
+		close(fd);
+		return -1;
+	}
+
+	for (unsigned i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "dump") == 0) {
+			unsigned val;
+
+			val = *(volatile unsigned *)(rpu_map + RPU_RPU_GLBL_CNTL);
+			printf ("RPU glbl_cntl:    0x%08x\n", val);
+			val = *(volatile unsigned *)(rpu_map + RPU_RPU_0_CFG);
+			printf ("RPU rpu0_cfg:     0x%08x\n", val);
+			val = *(volatile unsigned *)(rpu_map + RPU_RPU_0_STATUS);
+			printf ("RPU rpu0_status:  0x%08x\n", val);
+			val = *(volatile unsigned *)(rpu_map + RPU_RPU_1_CFG);
+			printf ("RPU rpu1_cfg:     0x%08x\n", val);
+			val = *(volatile unsigned *)(rpu_map + RPU_RPU_1_STATUS);
+			printf ("RPU rpu1_status:  0x%08x\n", val);
+			val = *(volatile unsigned *)(crl_map + CRL_APB_CPU_R5_CTRL);
+			printf ("CRL_APB cpu_r5_ctrl:  0x%08x\n", val);
+			val = *(volatile unsigned *)(crl_map + CRL_APB_RST_LPD_TOP);
+			printf ("CRL_APB rst_lpd_top:  0x%08x\n", val);
+		}
+		else if (strcmp(argv[i], "clear-tcm") == 0) {
+			clear_tcm(fd, &rpu_sram_map[0]);
+			clear_tcm(fd, &rpu_sram_map[1]);
+		}
+		else if (strcmp(argv[i], "dump-atcm0") == 0) {
+			if (dump_tcm(fd, ATCM0_ADDRESS) < 0)
+				return -1;
+		}
+		else if (strcmp(argv[i], "dump-btcm0") == 0) {
+			if (dump_tcm(fd, BTCM0_ADDRESS) < 0)
+				return -1;
+		}
+		else if (strcmp(argv[i], "dump-ocm0") == 0) {
+			if (dump_tcm(fd, OCM_ADDRESS) < 0)
+				return -1;
+		}
+		else if (strcmp(argv[i], "dump-ocm3") == 0) {
+			if (dump_tcm(fd, OCM_ADDRESS + 0x30000) < 0)
+				return -1;
+		}
+		else if (strcmp(argv[i], "dump-elf") == 0) {
+			if (i + 1 >= argc) {
+				printf("missing elf filename\n");
+				return -1;
+			}
+			const char *filename = argv[++i];
+			if (elf_foreach_segment(filename, EM_ARM,
+						elf_dump_cb, NULL) < 0)
+				return -1;
+		}
+		else if (strcmp(argv[i], "load") == 0) {
+			if (i + 1 >= argc) {
+				printf("missing elf filename\n");
+				return -1;
+			}
+			struct rpu_load_data data_cb;
+
+			data_cb.devmem_fd = fd;
+			data_cb.map = NULL;
+			data_cb.len = 0;
+			data_cb.vaddr = 0;
+
+			const char *filename = argv[++i];
+			if (elf_foreach_segment(filename, EM_ARM,
+						elf_rpu_load_cb, &data_cb) < 0)
+				return -1;
+		}
+		else
+			printf ("unknown subcommand %s\n", argv[i]);
+	}
+	close(fd);
+	return 0;
+}
+
 #endif /* !defined(SUPPORT_WRS) */
 
 static const struct tool_base tool_help = {
@@ -4051,6 +4351,13 @@ static const struct tool_base tool_aux_logger = {
         help_aux_logger
 };
 
+static const struct tool_base tool_zynqmp_rpu = {
+        "zynqmp-rpu",
+        "display RPU status on zynqmp",
+        do_zynqmp_rpu,
+        help_zynqmp_rpu,
+};
+
 #endif /* !defined(SUPPORT_WRS) */
 
 static const struct tool_base *tools[] = {
@@ -4068,6 +4375,7 @@ static const struct tool_base *tools[] = {
 #ifndef SUPPORT_WRS
 	&tool_wdiags,
         &tool_aux_logger,
+	&tool_zynqmp_rpu,
 #endif /* !defined(SUPPORT_WRS) */
 	NULL
 };
