@@ -4010,10 +4010,10 @@ static int do_aux_logger(int argc, char *argv[])
 /**
  * Register: CRL_APB_RST_LPD_TOP
  */
-#define CRL_APB_RST_LPD_TOP    0X0000023CU
-#define CRL_APB_RST_LPD_TOP_RPU_R50_RESET_MASK    (u32)0X00000001U
-#define CRL_APB_RST_LPD_TOP_RPU_AMBA_RESET_MASK    (u32)0X00000004U
-#define CRL_APB_RST_LPD_TOP_RPU_R51_RESET_MASK    (u32)0X00000002U
+#define CRL_APB_RST_LPD_TOP    0x0000023cU
+#define CRL_APB_RST_LPD_TOP_RPU_R50_RESET_MASK    0x00000001U
+#define CRL_APB_RST_LPD_TOP_RPU_AMBA_RESET_MASK   0x00000004U
+#define CRL_APB_RST_LPD_TOP_RPU_R51_RESET_MASK    0x00000002U
 
 /**
  * PMU_GLOBAL Base Address
@@ -4161,6 +4161,48 @@ static int clear_tcm(int fd, const struct rpu_sram_map_t *map)
 	return 0;
 }
 
+static int zynqmp_pm(const char *str)
+{
+	int fd;
+	static const char pm_file[] = "/sys/kernel/debug/zynqmp-firmware/pm";
+	size_t len = strlen(str);
+
+	fd = open(pm_file, O_WRONLY);
+	if (fd < 0) {
+		fprintf(stderr, "cannot open %s: %m\n", pm_file);
+		return -1;
+	}
+	if (write(fd, str, len) != len) {
+		fprintf(stderr, "cannot write string to %s: %m\n", pm_file);
+		close(fd);
+		return -1;
+	}
+	close(fd);
+	return 0;
+}
+
+static int zynqmp_init_rpu(int fd)
+{
+	/* configure RPU in split mode */
+	if (zynqmp_pm ("pm_ioctl 0 1 1 0\n") < 0)
+		return -1;
+	/* configure TCM in split mode */
+	if (zynqmp_pm ("pm_ioctl 0 3 0 0\n") < 0)
+		return -1;
+	/* set boot address */
+	if (zynqmp_pm ("pm_ioctl 7 2 0 0\n") < 0)
+		return -1;
+	/* power-up and un-reset RPU/TCM (but still halded) */
+	if (zynqmp_pm ("pm_request_node 15\n") < 0)
+		return -1;
+	if (zynqmp_pm ("pm_request_node 16\n") < 0)
+		return -1;
+	/* Clear ATCM and BTCM.  This is needed for ECC. */
+	clear_tcm(fd, &rpu_sram_map[0]);
+	clear_tcm(fd, &rpu_sram_map[1]);
+	return 0;
+}
+
 static void help_zynqmp_rpu(void)
 {
 	printf("usage: %s zynqmp-rpu\n", progname);
@@ -4243,12 +4285,29 @@ static int do_zynqmp_rpu(int argc, char *argv[])
 						elf_dump_cb, NULL) < 0)
 				return -1;
 		}
+		else if (strcmp(argv[i], "rpu-off") == 0) {
+			/* Power down RPU 0 */
+			if (zynqmp_pm ("pm_force_powerdown 7\n") < 0)
+				return -1;
+		}
 		else if (strcmp(argv[i], "load") == 0) {
 			if (i + 1 >= argc) {
 				printf("missing elf filename\n");
 				return -1;
 			}
 			struct rpu_load_data data_cb;
+
+			unsigned rst_lpd = *(volatile unsigned *)(crl_map + CRL_APB_RST_LPD_TOP);
+
+			if ((rst_lpd & CRL_APB_RST_LPD_TOP_RPU_R50_RESET_MASK) != 0) {
+				printf("R5-0 under reset, run init sequence\n");
+				if (zynqmp_init_rpu(fd) < 0)
+					return -1;
+			}
+
+			/* Power down RPU 0, in case it was running */
+			if (zynqmp_pm ("pm_force_powerdown 7\n") < 0)
+				return -1;
 
 			data_cb.devmem_fd = fd;
 			data_cb.map = NULL;
@@ -4258,6 +4317,10 @@ static int do_zynqmp_rpu(int argc, char *argv[])
 			const char *filename = argv[++i];
 			if (elf_foreach_segment(filename, EM_ARM,
 						elf_rpu_load_cb, &data_cb) < 0)
+				return -1;
+
+			/* Wakeup RPU 0 */
+			if (zynqmp_pm ("pm_request_wakeup 7 1 0 1\n") < 0)
 				return -1;
 		}
 		else
