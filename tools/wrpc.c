@@ -2191,6 +2191,7 @@ void spll_dump_debug_data(const uint32_t *buf, size_t size)
 		switch (sig)
 		{
 		case SPLL_DBG_SIGNAL_ERR:
+		case SPLL_DBG_SIGNAL_REF:
 			value = signext32(value_raw, 23);
 			break;
 		default:
