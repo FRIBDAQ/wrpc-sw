@@ -352,7 +352,7 @@ int minic_tx_frame(struct wr_minic *nic, struct wr_ethhdr_vlan *hdr,
 
 		if (i == 100)
 		{
-			pp_printf("Warning: tx timestamp never became available\n");
+			pp_printf("Warning: tx timestamp never became available\n\n");
 			ts_valid = 0;
 		}
 
