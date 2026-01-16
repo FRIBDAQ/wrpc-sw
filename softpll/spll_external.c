@@ -36,8 +36,10 @@ void external_init(volatile struct spll_external_state *s, int ext_ref)
 	if (scb_ljd_present_global)
 		idx++;
 
+#ifndef CONFIG_IGNORE_HPLL
 	/* Helper now tracks the external clock */
 	helper_init(s->helper, idx);
+#endif
 	/* So does main clock */
 	mpll_init(s->main, idx, spll_n_chan_ref);
 
@@ -47,8 +49,9 @@ void external_init(volatile struct spll_external_state *s, int ext_ref)
 
 void external_start(struct spll_external_state *s)
 {
+#ifndef CONFIG_IGNORE_HPLL
 	helper_start(s->helper);
-
+#endif
 	SPLL->ECCR = SPLL_ECCR_EXT_EN;
 
 	s->align_state = ALIGN_STATE_WAIT_CLKIN;

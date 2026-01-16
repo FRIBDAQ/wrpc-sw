@@ -115,8 +115,10 @@ static inline void sequencing_fsm(struct softpll_state *s, int tag_value, int ta
 		   prior to starting the SPLL. */
 		case SEQ_CLEAR_DACS:
 		{
+#ifndef CONFIG_IGNORE_HPLL
 			/* Helper always starts at the maximum value (to make sure it locks on positive offset */
 			SPLL->DAC_HPLL = s->helper.pi.y_max;
+#endif
 
 			/* Main starts at midscale */
 			SPLL->DAC_MAIN = (s->mpll.pi.y_max + s->mpll.pi.y_min) / 2;
@@ -145,9 +147,11 @@ static inline void sequencing_fsm(struct softpll_state *s, int tag_value, int ta
 					s->seq_state = SEQ_WAIT_EXT;
 				}
 				else {
+#ifndef CONFIG_IGNORE_HPLL
 					/* Once the DAC are on and stable,
 					   start helper PLL */
 					helper_start(&s->helper);
+#endif
 					s->seq_state = SEQ_WAIT_HELPER;
 				}
 			}
@@ -211,22 +215,24 @@ static inline void sequencing_fsm(struct softpll_state *s, int tag_value, int ta
 
 static inline void update_loops(struct softpll_state *s, int tag_value, int tag_source)
 {
-
+#ifndef CONFIG_IGNORE_HPLL
 	helper_update(&s->helper, tag_value, tag_source);
 
-	if(s->helper.ld.locked)
-	{
-		mpll_update(&s->mpll, tag_value, tag_source);
+	/* If the helper is not locked, the other tags are meaningless */
+	if(!s->helper.ld.locked)
+		return;
+#endif
 
-		if(s->seq_state == SEQ_READY) {
-			if(s->mode == SPLL_MODE_SLAVE) {
-				int i;
-				for (i = 0; i < spll_n_chan_out - 1; i++)
-					mpll_update(&s->aux[i].pll.dmtd, tag_value, tag_source);
-			}
+	mpll_update(&s->mpll, tag_value, tag_source);
 
-			update_ptrackers(s, tag_value, tag_source);
+	if(s->seq_state == SEQ_READY) {
+		if(s->mode == SPLL_MODE_SLAVE) {
+			int i;
+			for (i = 0; i < spll_n_chan_out - 1; i++)
+				mpll_update(&s->aux[i].pll.dmtd, tag_value, tag_source);
 		}
+
+		update_ptrackers(s, tag_value, tag_source);
 	}
 }
 
@@ -277,8 +283,10 @@ void spll_very_init(void)
 	softpll.mpll.gain_sched = NULL;
 
 
-	helper_very_init((struct spll_helper_state *) &softpll.helper); // set up default PI gains/lock thresholds
-
+#ifndef CONFIG_IGNORE_HPLL
+	// set up default PI gains/lock thresholds
+	helper_very_init((struct spll_helper_state *) &softpll.helper);
+#endif
 	init_irq();
 }
 
@@ -328,6 +336,7 @@ void spll_init(int mode, int slave_ref_channel, int flags)
 	else
 		s->seq_state = SEQ_CLEAR_DACS;
 
+#ifndef CONFIG_IGNORE_HPLL
 	int helper_ref;
 
 	if( mode == SPLL_MODE_SLAVE)
@@ -336,6 +345,8 @@ void spll_init(int mode, int slave_ref_channel, int flags)
 		helper_ref = spll_n_chan_ref; // Master/GM mode: lock the helper to the local ref clock
 
 	helper_init(&s->helper, helper_ref);
+#endif
+
 	mpll_init(&s->mpll, slave_ref_channel, spll_n_chan_ref);
 
 	for (i = 0; i < spll_n_chan_out - 1; i++) {
