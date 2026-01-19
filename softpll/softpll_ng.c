@@ -99,13 +99,8 @@ static inline void update_ptrackers(struct softpll_state *s, int tag_value, int 
 	}
 }
 
-static inline void sequencing_fsm(struct softpll_state *s, int tag_value, int tag_source)
+static inline void sequencing_fsm(struct softpll_state *s)
 {
-	if( tag_source == spll_n_chan_ref ) // main osc
-		s->tag_count++;
-	else if ( tag_source == 0 ) // ref 0
-		s->ref_count++;
-
 	switch (s->seq_state) {
 		/* State "Disabled". Entered when the whole PLL is off */
 		case SEQ_DISABLED:
@@ -250,12 +245,18 @@ void spll_irq_entry(void)
 		tag_source = SPLL_TRR_R0_CHAN_ID_R(trr);
 		tag_value  = SPLL_TRR_R0_VALUE_R(trr);
 
+		/* Update stats. */
+		if( tag_source == spll_n_chan_ref ) // main osc
+		  s->tag_count++;
+		else if ( tag_source == 0 ) // ref 0
+		  s->ref_count++;
+
 		if (1) {
 			spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_SRC, tag_source, 0);
 			spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_TAG, tag_value, 1);
 		}
 
-		sequencing_fsm(s, tag_value, tag_source);
+		sequencing_fsm(s);
 		update_loops(s, tag_value, tag_source);
 
 	}
