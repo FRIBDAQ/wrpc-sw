@@ -197,7 +197,9 @@ static inline void sequencing_fsm(struct softpll_state *s)
 		case SEQ_READY:
 		{
 			if ((s->mode == SPLL_MODE_GRAND_MASTER && !external_locked(&s->ext))
+#ifndef CONFIG_IGNORE_HPLL
 			    || !s->helper.ld.locked
+#endif
 			    || (s->mode == SPLL_MODE_SLAVE && !s->mpll.locked)) {
 				s->delock_count++;
 				s->seq_state = SEQ_CLEAR_DACS;
