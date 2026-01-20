@@ -2255,12 +2255,20 @@ void spll_readout_ertm14(struct board_ertm14* board, int undersample )
 static unsigned spll_fifo_empty(struct board *board)
 {
 	uint32_t r = board->readl(board, WRC_HOST_MAP_SPLL + SPLL_HOST_MAP_DFR_HOST_CSR);
+	if (0)
+		fprintf(stderr, "spll csr: %08x\n", r);
 	return r & SPLL_HOST_MAP_DFR_HOST_CSR_EMPTY;
 }
 
 static uint32_t spll_read_word(struct board *board)
 {
-	return board->readl(board, WRC_HOST_MAP_SPLL + SPLL_HOST_MAP_DFR_HOST_R0);
+	uint32_t r;
+
+	r = board->readl(board, WRC_HOST_MAP_SPLL + SPLL_HOST_MAP_DFR_HOST_R0);
+
+	if (0)
+		fprintf(stderr, "spll r0:  %08x\n", r);
+	return r;
 }
 
 static void spll_purge(struct board* board)
@@ -2278,10 +2286,11 @@ static unsigned spll_read_direct(struct board* board, uint32_t *buf, unsigned le
 	int got_a_full_record = 0;
 
 	while (cnt < len) {
-		while (spll_fifo_empty(board)) {
+		if (spll_fifo_empty(board)) {
 			if (got_a_full_record)
 				break;
 			usleep(100);
+			continue;
 		}
 
 		uint32_t r = spll_read_word(board);
