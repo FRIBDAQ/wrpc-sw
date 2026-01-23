@@ -73,6 +73,7 @@ static const struct subcmd {
 	{"gm",     wrc_ptp_set_mode, WRC_MODE_GM},
 	{"master", wrc_ptp_set_mode, WRC_MODE_MASTER},
 	{"slave",  wrc_ptp_set_mode, WRC_MODE_SLAVE},
+	{"tracking", wrh_servo_enable_tracking, USE_CMD_PARAM},
 #ifdef CONFIG_CMD_PTP_ADV
 	 /* use next param as a val for func */
 	{"prio1",    wrc_ptp_set_prio1, USE_CMD_PARAM},
