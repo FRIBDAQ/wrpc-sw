@@ -262,12 +262,12 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (source != s->id_ref)
 		return;
 
-	tag &= (1<<22) - 1;
+	tag &= (1<<24) - 1;
 
 	/* NB: a tag unit is 200ps >> 14 */
 	/* Compute delta of RX clock (and sign extend) */
 	ref_dt = tag - s->tag_ref;
-	ref_dt = (ref_dt << 10) >> 10;
+	ref_dt = (ref_dt << 8) >> 8;
 	s->tag_ref = tag;
 
 	/* If there are both ref and out tags, ... */
@@ -316,7 +316,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	}
 	else {
 		err = s->adder_ref + tag;
-		err = (err << 10) >> 10;
+		err = (err << 8) >> 8;
 	}
 
 #if 0 //ndef WITH_SEQUENCING
