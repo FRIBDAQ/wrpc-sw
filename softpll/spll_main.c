@@ -117,7 +117,7 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 	s->enabled = 0;
 
 	/* Frequency branch lock detection */
-	s->freq_ld.threshold = (1 << 14) / 128; /* ~1.5ps */
+	s->freq_ld.threshold = (1 << 14) / 16;
 	s->freq_ld.lock_samples = 50;
 	s->freq_ld.delock_samples = 20000;
 
