@@ -406,7 +406,11 @@ static int32_t from_picos(int32_t ps)
 
 	/* 1step = 200ps/128/(1<<15)*256
                  = 200ps/(1<<15)*2
-                 = 200ps/(1<<14) */
+                 = 200ps/(1<<14)
+	   200ps: period of the GTHe4 oversampled ref clock
+	   128: number of steps of the phase interpolator
+	   (1<<15): number of values averaged
+	   256: number of bits removed. */
 	if (ps >= 0) {
 		ups *= 1 << 14;
 		__div64_32(&ups, 200);
