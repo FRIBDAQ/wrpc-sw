@@ -56,37 +56,47 @@ void pi_init(spll_pi_t *pi)
    if it's withing an acceptable range (i.e. <-ld.threshold,
    ld.threshold>. If it has been inside the range for
    (ld.lock_samples) cyckes, the FSM assumes the PLL is locked.
-   
-   Return value:
-   0: PLL not locked
-   1: PLL locked
-   -1: PLL just got out of lock
  */
-int ld_update(spll_lock_det_t *ld, int y)
+void ld_update(spll_lock_det_t *ld, int y)
 {
 	ld->lock_changed = 0;
 
 	if (abs(y) <= ld->threshold) {
-		if (ld->lock_cnt < ld->lock_samples)
-			ld->lock_cnt++;
+		/* Value is correct. */
+		if (ld->locked) {
+			if (ld->lock_cnt > 0)
+				ld->lock_cnt--;
+		}
+		else {
+			/* Currently not locked. */
+			if (ld->lock_cnt < ld->lock_samples)
+				ld->lock_cnt++;
+			else {
+				/* Just locked! */
+				ld->lock_changed = 1;
+				ld->locked = 1;
+				ld->lock_cnt = 0;
+			}
 
-		if (ld->lock_cnt == ld->lock_samples) {
-			ld->lock_changed = !ld->locked;
-			ld->locked = 1;
-			return 1;
 		}
 	} else {
-		if (ld->lock_cnt > ld->delock_samples)
-			ld->lock_cnt--;
-
-		if (ld->lock_cnt == ld->delock_samples && ld->locked) {
-			ld->lock_cnt = 0;
-			ld->lock_changed = ld->locked;
-			ld->locked = 0;
-			return -1;
+		/* Value is not correct */
+		if (!ld->locked) {
+			if (ld->lock_cnt > 0)
+				ld->lock_cnt--;
+		}
+		else {
+			/* Currently locked */
+			if (ld->lock_cnt < ld->delock_samples)
+				ld->lock_cnt++;
+			else {
+				/* Just unlocked! */
+				ld->lock_changed = 1;
+				ld->locked = 0;
+				ld->lock_cnt = 0;
+			}
 		}
 	}
-	return ld->locked;
 }
 
 void ld_init(spll_lock_det_t *ld)

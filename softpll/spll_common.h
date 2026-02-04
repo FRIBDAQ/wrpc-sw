@@ -37,13 +37,22 @@ typedef struct {
 
 /* lock detector state */
 typedef struct {
-	int lock_cnt;		/* Lock sample counter */
-	int lock_samples;	/* Number of samples below the (threshold) to assume that we are locked */
-	int delock_samples;	/* Accumulated number of samples that causes the PLL go get out of lock.
-				   delock_samples < lock_samples.  */
-	int threshold;		/* Error threshold */
-	int locked;		/* Non-zero: we are locked */
-	int lock_changed;
+	/* Number of samples before changing state.
+	   When unlocked: number of correct samples minus number of incorrect
+	     samples.  When lock_samples is reached, the state changes.
+	   When locked: number of incorrect samples minus number of correct
+	     samples.  When delock_samples is reached, the state changes.  */
+	unsigned lock_cnt;
+
+	/* Number of samples below the threshold to lock. */
+	unsigned lock_samples;
+
+	/* Number of samples above the threshold to unlock. */
+	unsigned delock_samples;
+	
+	unsigned threshold;	/* Error threshold */
+	unsigned char locked;	/* Non-zero: we are locked */
+	unsigned char lock_changed;
 } spll_lock_det_t;
 
 typedef struct {
@@ -65,7 +74,7 @@ void pi_init(spll_pi_t *pi);
 int pi_update(spll_pi_t *pi, int x);
 
 void ld_init(spll_lock_det_t *ld);
-int ld_update(spll_lock_det_t *ld, int y);
+void ld_update(spll_lock_det_t *ld, int y);
 
 void spll_enable_tagger(int channel, int enable);
 
