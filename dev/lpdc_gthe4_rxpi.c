@@ -102,7 +102,7 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	unsigned res = regs->ps_res;
 	if ((res & RXPI_GTHE4_MAP_PS_RES_GEN_MASK)
 	    == (state->ps_res & RXPI_GTHE4_MAP_PS_RES_GEN_MASK)) {
-	    /* No new measure */
+	    /* Same generation: no new measure */
 	    break;
 	}
 
@@ -116,6 +116,7 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	if (val == 0)
 	    state->phase_0 = phase;
 	if (val >= NBR_SWEEP_SAMPLES && state->phase_0 >= 0) {
+	    /* Found phase 1 and already got phase 0. */
 	    unsigned tag_ref = softpll.mpll.tag_ref;
 	    unsigned phase_1 = phase;
 
@@ -124,7 +125,8 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 
 	    /* Phase shift clock vco is running at 1250Mhz, so the
 	       period is 800ps.
-	       A shift is 800ps/56 */
+	       A shift is 800ps/56
+	       (56 is the number of available phase shifts per period) */
 	    phy_dbg("sweep-result ph0:%u.%02u ph1:%u.%02u ph:%u.%02u phps:%ups\n",
 		    state->phase_0 / 56, state->phase_0 % 56,
 		    phase_1 / 56, phase_1 % 56,
@@ -138,7 +140,8 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	    unsigned sub_tag = tag_ref & ((1 << 14) - 1);
 
 	    /* Traces.
-	       Extract the remainder of 200ps for phase shift and tag */
+	       Extract the remainder of 200ps for phase shift and tag
+	       (There is 14 rxpi phase bits per 200ps period). */
 	    int ph_ps = (phase * 800 / 56) % 200;
 	    int tag_ps = ((tag_ref & ((1 << 14) - 1)) * 200) >> 14;
 	    phy_dbg("ph_ps:%d tag_ps:%d diff_ps:%d sub_tag:%04x\n",
