@@ -168,7 +168,7 @@ CFLAGS = $(cflags-y) \
 ldflags-$(CONFIG_LTO) += -flto
 
 # Assembler Flags
-ASFLAGS = -MD -I. $(archflags-y)
+ASFLAGS = -MD -I. $(asflags-y)
 
 LDFLAGS = $(ldflags-y) \
 	-Wl,--gc-sections -Os -lgcc -lc
