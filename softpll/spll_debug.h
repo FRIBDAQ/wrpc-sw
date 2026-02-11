@@ -25,17 +25,19 @@ integral/proportional gains on the response of the system.
 #define SPLL_DBG_SIGNAL_ERR 1
 #define SPLL_DBG_SIGNAL_TAG 2
 #define SPLL_DBG_SIGNAL_REF 3
-#define SPLL_DBG_SIGNAL_PERIOD 4
+#define SPLL_DBG_SIGNAL_DT 4
 #define SPLL_DBG_SIGNAL_SAMPLE_ID 5
 #define SPLL_DBG_SIGNAL_EVENT 6
 #define SPLL_DBG_SIGNAL_TIME_MS 7
 #define SPLL_DBG_SIGNAL_PHASE_CURRENT 8
 #define SPLL_DBG_SIGNAL_PHASE_TARGET 9
 #define SPLL_DBG_SIGNAL_SRC 10
+#define SPLL_DBG_SIGNAL_MISC 11
 
 /* For servo */
 #define SPLL_DBG_SIGNAL_OFFSET_SEC 0
 #define SPLL_DBG_SIGNAL_OFFSET_PS  1
+#define SPLL_DBG_SIGNAL_RAW_DELAY  2
 
 #define SPLL_DBG_MAX_SOURCES 8 // maximum number of "source" PLLs
 
@@ -60,6 +62,8 @@ integral/proportional gains on the response of the system.
 #define SPLL_DBG_EVT_SERVO_STATE 10		/* 10 .. 19 */
 #define SPLL_DBG_EVT_PTP_SYNC 20
 #define SPLL_DBG_EVT_PTP_RESP 21
+#define SPLL_DBG_EVT_PHY_READY 22
+#define SPLL_DBG_EVT_PHY_DOWN 23
 
 #define SPLL_DBG_EXTRACT_SOURCE(x) ( (x >> 28) & 0x7 )
 #define SPLL_DBG_EXTRACT_SIGNAL(x) ( (x >> 24) & 0xf )

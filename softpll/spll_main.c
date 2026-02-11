@@ -352,8 +352,11 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_CURRENT, s->phase_shift_current, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_TARGET, s->phase_shift_target, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TIME_MS, timer_get_tics(), 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_REF, ref_dt, 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->adder_ref, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, tag, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_DT, ref_dt, 0);
+	//spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->adder_ref, 0);
+	//spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->phase_ld.lock_cnt, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_MISC, (int)s->pi.integrator, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_ERR, err, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_SAMPLE_ID, s->sample_n++, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_Y, y, 1);

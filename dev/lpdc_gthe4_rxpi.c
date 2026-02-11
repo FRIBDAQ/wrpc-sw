@@ -229,6 +229,8 @@ int phy_calibration_poll(void)
     case RX_WAIT_COMMA:
 	if (status & RXPI_GTHE4_MAP_STATUS_PHY_READY) {
 	    unsigned bitslide = regs->bitslide;
+	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
+		       SPLL_DBG_EVT_PHY_READY, 1);
 	    phy_dbg("comma-aligned:%08x slide:%u\n", status, bitslide);
 	    if (bitslide & 1) {
 		/* Try again */
@@ -282,6 +284,8 @@ int phy_calibration_poll(void)
 	break;
     case RX_READY:
 	if (!(status & RXPI_GTHE4_MAP_STATUS_PHY_READY)) {
+	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
+		       SPLL_DBG_EVT_PHY_DOWN, 1);
 	    phy_dbg("link down\n");
 	    rx_state.state = RX_RESET;
 	}
