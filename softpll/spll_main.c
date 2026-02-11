@@ -377,7 +377,7 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 		else
 			s->adder_ref += delta;
 
-		s->adder_ref = (s->adder_ref << 10) >> 10;
+		s->adder_ref = (s->adder_ref << 8) >> 8;
 	}
 
 	if(s->freq_ld.locked)
