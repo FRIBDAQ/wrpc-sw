@@ -11,7 +11,7 @@
 
 #include "softpll_ng.h"
 
-static int tag_ref = -1;
+static int tag_ref = 0;
 
 extern int reverse_spll;
 
@@ -72,22 +72,29 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 	if(!s->enabled)
 		return;
 
-	register int delta;
+	register unsigned delta;
 	if (!reverse_spll)
 		delta = (tag_ref - tag) & ((1 << HPLL_N) - 1);
 	else
 		delta = (tag - tag_ref) & ((1 << HPLL_N) - 1);
 
-	register int index = delta >> (HPLL_N - 2);
+	register unsigned index = delta >> (HPLL_N - 2);
 
 	/* hack: two since PTRACK_WRAP_LO/HI are in 1/4 and 3/4 of the scale,
 	   we can use the two MSBs of delta and a trivial LUT instead,
 	   removing 2 branches */
 	s->sign_offset += adj_tab[index + s->preserve_sign];
 	s->preserve_sign = index << 2;
-	
-	s->acc += delta + s->sign_offset;
+
+	/* Adjust for roll-over */
+	delta += s->sign_offset;
+
+	s->acc += delta;
 	s->avg_count ++;
+
+	spll_debug(SPLL_DBG_SRC_EXT, SPLL_DBG_SIGNAL_TAG, s->acc & 0xffff, 0);
+	spll_debug(SPLL_DBG_SRC_EXT, SPLL_DBG_SIGNAL_REF, s->acc >> 16, 0);
+	spll_debug(SPLL_DBG_SRC_EXT, SPLL_DBG_SIGNAL_SAMPLE_ID, s->avg_count, 0);
 
 	if (s->avg_count == s->n_avg) {
 		int avg = s->acc / (int)s->n_avg;
@@ -104,8 +111,12 @@ void ptrackers_update(struct spll_ptracker_state *ptrackers, int tag,
 		}
 		else
 			s->ready = 1;
+		spll_debug(SPLL_DBG_SRC_EXT, SPLL_DBG_SIGNAL_PHASE_CURRENT,
+			   phase, 0);
+
 		s->phase_val = phase;
 		s->acc = 0;
 		s->avg_count = 0;
 	}
+	spll_debug(SPLL_DBG_SRC_EXT, SPLL_DBG_SIGNAL_DT, delta >> 16, 1);
 }
