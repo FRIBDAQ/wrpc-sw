@@ -42,8 +42,9 @@ void ptracker_start(struct spll_ptracker_state *s)
 }
 
 /* Number of tag bits ~= 51_200 ps ~= 4_194_304 */
+/* To avoid overflows in accumulator, reduce to 22b */
 #undef HPLL_N
-#define HPLL_N 24
+#define HPLL_N 22
 
 /* The phase of a ref_clk period (16ns) ~= 1_310_720 */
 #define PHASE_MAX ((16000 / 200) << 14)

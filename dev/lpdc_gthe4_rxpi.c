@@ -43,8 +43,9 @@ enum rx_fsm_state {
     RX_WAIT_RESET,
     /* Out of reset, wait for commas */
     RX_WAIT_COMMA,
+    RX_WAIT_SEQ,
     /* Comma detected and at correct alignment */
-    RX_WAIT_FREQ_LOCK,
+    RX_WAIT_MPLL,
     RX_SWEEP_WAIT,
     RX_READY
 };
@@ -116,8 +117,9 @@ static void rxpi_sweep_fsm(struct sweep_state *state)
 	if (val == 0)
 	    state->phase_0 = phase;
 	if (val >= NBR_SWEEP_SAMPLES && state->phase_0 >= 0) {
-	    /* Found phase 1 and already got phase 0. */
-	    unsigned tag_ref = softpll.mpll.tag_ref;
+	    /* Found phase 1 and already got phase 0,
+	       Keep 22b like in spll_ptracker */
+	    unsigned tag_ref = softpll.mpll.tag_ref & ((1 << 22) - 1);
 	    unsigned phase_1 = phase;
 
 	    /* Get the middle between before and after the rising edge */
@@ -207,6 +209,15 @@ int phy_calibration_poll(void)
     unsigned status;
 
     status = regs->status;
+    if (rx_state.state >= RX_WAIT_SEQ
+	&& !(status & RXPI_GTHE4_MAP_STATUS_PHY_READY)) {
+	spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
+		   SPLL_DBG_EVT_PHY_DOWN, 1);
+	phy_dbg("link down\n");
+	rx_state.state = RX_RESET;
+	regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
+    }
+
     switch (rx_state.state) {
     case RX_RESET: {
 	struct wr_endpoint_device* dev = &wrc_endpoint_dev;
@@ -214,10 +225,13 @@ int phy_calibration_poll(void)
 	    phy_dbg("reset rx\n");
 	    regs->reset |= RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
 	    regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
-	    tmo_init(&rx_state.timeout, 200 + rx_state.reset_iter++);
+	    tmo_init(&rx_state.timeout, 20 + rx_state.reset_iter++);
 	    rx_state.state = RX_WAIT_RESET;
 	}
+	/* Main pll is not locked. */
 	softpll.mpll.rxpi_ready = 0;
+	/* Do not run mpll while establishing the link */
+	softpll.mpll.link_up = 0;
 	break;
     }
     case RX_WAIT_RESET:
@@ -237,20 +251,21 @@ int phy_calibration_poll(void)
 		rx_state.state = RX_RESET;
 	    }
 	    else {
-		rx_state.state = RX_WAIT_FREQ_LOCK;
+		rx_state.state = RX_WAIT_SEQ;
 		softpll.mpll.rxpi_ready = 0;
 		regs->ctrl = RXPI_GTHE4_MAP_CTRL_RDY;
 		rx_state.reset_iter = 0;
+		softpll.mpll.link_up = 1;
 	    }
 	}
 	break;
 
-    case RX_WAIT_FREQ_LOCK:
-	if (!(status & RXPI_GTHE4_MAP_STATUS_PHY_READY)) {
-	    phy_dbg("not comma aligned: %08x\n", status);
-	    rx_state.state = RX_RESET;
-	    regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
-	}
+    case RX_WAIT_SEQ:
+	if (softpll.seq_state == SEQ_WAIT_MAIN)
+	    rx_state.state = RX_WAIT_MPLL;
+	break;
+
+    case RX_WAIT_MPLL:
 	if (softpll.mpll.phase_ld.locked) {
 	    phy_dbg("phase locked, start sweep!\n");
 	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
@@ -265,17 +280,20 @@ int phy_calibration_poll(void)
 	if (rx_state.sweep.state == SWEEP_DONE) {
 	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
 		       SPLL_DBG_EVT_SWEEP_DONE, 1);
+	    pp_printf("rxpi: set ptrackers[0] offset: 0x%x\n",
+		      rx_state.sweep.delta);
+	    /* Disable the mpll for atomic changes */
 	    softpll.mpll.enabled = 0;
 	    softpll.mpll.phase_shift_current = rx_state.sweep.abs_phase;
 	    softpll.mpll.phase_shift_target = 0;
-	    pp_printf("rxpi: set ptrackers[0] offset: 0x%x\n",
-		      rx_state.sweep.delta);
 	    softpll.ptrackers[0].offset = -rx_state.sweep.delta;
 	    softpll.ptrackers[0].preserve_sign = 1 << 2;
 	    softpll.ptrackers[0].sign_offset = 0;
 
 	    softpll.mpll.rxpi_ready = 1;
 	    softpll.mpll.enabled = 1;
+	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
+		       SPLL_DBG_EVT_SWEEP_DONE, 1);
 	    rx_state.state = RX_READY;
 	}
 	else if (rx_state.sweep.state == SWEEP_ERROR) {
@@ -283,20 +301,14 @@ int phy_calibration_poll(void)
 	}
 	break;
     case RX_READY:
-	if (!(status & RXPI_GTHE4_MAP_STATUS_PHY_READY)) {
-	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
-		       SPLL_DBG_EVT_PHY_DOWN, 1);
-	    phy_dbg("link down\n");
-	    rx_state.state = RX_RESET;
-	}
-	else if (!softpll.mpll.phase_ld.locked) {
+	if (!softpll.mpll.phase_ld.locked) {
 	    phy_dbg("pll unlocked\n");
 	    softpll.mpll.enabled = 0;
 	    ld_init((spll_lock_det_t *)&softpll.mpll.phase_ld);
 	    ld_init((spll_lock_det_t *)&softpll.mpll.freq_ld);
 	    softpll.mpll.rxpi_ready = 0;
 	    softpll.mpll.enabled = 1;
-	    rx_state.state = RX_WAIT_FREQ_LOCK;
+	    rx_state.state = RX_WAIT_SEQ;
 	}
 	break;
     }
