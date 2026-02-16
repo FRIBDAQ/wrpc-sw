@@ -45,14 +45,16 @@ struct spll_main_state {
 	int tag_out, tag_out_d;
 	unsigned char locked; // locked flag
 	unsigned char rxpi_ready;
+	unsigned char enabled;
+	unsigned char link_up;
+	unsigned char id_ref, id_out;	/* IDs of the reference and the output channel */
+	unsigned char dac_index;
+	unsigned char ps_freeze, vco_freeze;
+	unsigned char dbg_src_id;
+
 	int phase_shift_target;
 	int phase_shift_current;
-	int id_ref, id_out;	/* IDs of the reference and the output channel */
 	int sample_n;
-	int dac_index;
-	int enabled;
-	int ps_freeze, vco_freeze;
-	int dbg_src_id;
 
 	uint32_t lock_start_ms;
 	int last_phase_lock_duration_ms;

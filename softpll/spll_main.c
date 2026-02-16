@@ -256,9 +256,6 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	int err, y;
 	int ref_dt;
 
-	if (!s->enabled)
-	  return;
-
 	if (source != s->id_ref)
 		return;
 
@@ -269,6 +266,23 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	ref_dt = tag - s->tag_ref;
 	ref_dt = (ref_dt << 8) >> 8;
 	s->tag_ref = tag;
+
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_CURRENT, s->phase_shift_current, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_TARGET, s->phase_shift_target, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TIME_MS, timer_get_tics(), 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, tag, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_DT, ref_dt, 0);
+	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_SAMPLE_ID, s->sample_n++, 0);
+
+	if (!s->enabled || !s->link_up) {
+		spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_Y, s->pi.y, 1);
+		return;
+	}
+
+	if (s->discard_early_cnt > 1) {
+		s->discard_early_cnt--;
+		return;
+	}
 
 	/* If there are both ref and out tags, ... */
 #if 0 /* ndef CONFIG_FRAC_SPLL */
@@ -349,16 +363,10 @@ void mpll_update(struct spll_main_state *s, int tag, int source)
 	if (s->dac_index == 0)
 		spll_log_dac(y);
 
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_CURRENT, s->phase_shift_current, 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_PHASE_TARGET, s->phase_shift_target, 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TIME_MS, timer_get_tics(), 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, tag, 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_DT, ref_dt, 0);
 	//spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->adder_ref, 0);
 	//spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_TAG, s->phase_ld.lock_cnt, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_MISC, (int)s->pi.integrator, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_ERR, err, 0);
-	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_SAMPLE_ID, s->sample_n++, 0);
 	spll_debug(s->dbg_src_id, SPLL_DBG_SIGNAL_Y, y, 1);
 
 	if (s->locked
