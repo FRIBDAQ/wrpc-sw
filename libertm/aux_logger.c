@@ -61,8 +61,6 @@ static const char *dbg_signal_to_string(int src)
 		return "err";
 	case SPLL_DBG_SIGNAL_Y:
 		return "y";
-	case SPLL_DBG_SIGNAL_PERIOD:
-		return "period";
 	case SPLL_DBG_SIGNAL_REF:
 		return "ref";
 	case SPLL_DBG_SIGNAL_TAG:
