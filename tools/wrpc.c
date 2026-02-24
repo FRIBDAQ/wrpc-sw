@@ -4029,6 +4029,8 @@ static int do_aux_logger(int argc, char *argv[])
  * RPU Base Address
  */
 #define RPU_BASEADDR      0xff9a0000u
+#define R5_DBG_0_BASEADDR 0xfebf0000u
+#define R5_DBG_1_BASEADDR 0xfebf2000u
 
 /**
  * Register: RPU_RPU_GLBL_CNTL
@@ -4261,6 +4263,244 @@ static int zynqmp_init_rpu(int fd)
 	return 0;
 }
 
+#define R5_DBG_DIDR	0x0000 // Debug ID register
+#define R5_DBG_WFAR	0x0018 // The Watchpoint Fault Address Register
+#define R5_DBG_VCR	0x001C // Vector Catch Register
+#define R5_DBG_DSCCR	0x0028 // Debug State Cache Control Register
+#define R5_DBG_DTRRXext	0x0080 // Read Data Transfer Register
+#define R5_DBG_ITR	0x0084 // Instruction Transfer Register
+#define R5_DBG_DSCRext	0x0088 // Debug Status and Control Register
+#define R5_DBG_DTRTXext	0x008C // Write Data Transfer Register
+#define R5_DBG_DRCR	0x0090 // Debug Run Control Register
+#define R5_DBG_BVR0	0x0100 // Breakpoint Value Register 0
+#define R5_DBG_BVR1	0x0104 // Breakpoint Value Register 1
+#define R5_DBG_BVR2	0x0108 // Breakpoint Value Register 2
+#define R5_DBG_BVR3	0x010C // Breakpoint Value Register 3
+#define R5_DBG_BVR4	0x0110 // Breakpoint Value Register 4
+#define R5_DBG_BVR5	0x0114 // Breakpoint Value Register 5
+#define R5_DBG_BVR6	0x0118 // Breakpoint Value Register 6
+#define R5_DBG_BVR7	0x011C // Breakpoint Value Register 7
+#define R5_DBG_BCR0	0x0140 // Breakpoint Control Register 0
+#define R5_DBG_BCR1	0x0144 // Breakpoint Control Register 1
+#define R5_DBG_BCR2	0x0148 // Breakpoint Control Register 2
+#define R5_DBG_BCR3	0x014C // Breakpoint Control Register 3
+#define R5_DBG_BCR4	0x0150 // Breakpoint Control Register 4
+#define R5_DBG_BCR5	0x0154 // Breakpoint Control Register 5
+#define R5_DBG_BCR6	0x0158 // Breakpoint Control Register 6
+#define R5_DBG_BCR7	0x015C // Breakpoint Control Register 7
+#define R5_DBG_WVR0	0x0180 // Watchpoint Value Register 0
+#define R5_DBG_WVR1	0x0184 // Watchpoint Value Register 1
+#define R5_DBG_WVR2	0x0188 // Watchpoint Value Register 2
+#define R5_DBG_WVR3	0x018C // Watchpoint Value Register 3
+#define R5_DBG_WVR4	0x0190 // Watchpoint Value Register 4
+#define R5_DBG_WVR5	0x0194 // Watchpoint Value Register 5
+#define R5_DBG_WVR6	0x0198 // Watchpoint Value Register 6
+#define R5_DBG_WVR7	0x019C // Watchpoint Value Register 7
+#define R5_DBG_WCR0	0x01C0 // Watchpoint Control Register 0
+#define R5_DBG_WCR1	0x01C4 // Watchpoint Control Register 1
+#define R5_DBG_WCR2	0x01C8 // Watchpoint Control Register 2
+#define R5_DBG_WCR3	0x01CC // Watchpoint Control Register 3
+#define R5_DBG_WCR4	0x01D0 // Watchpoint Control Register 4
+#define R5_DBG_WCR5	0x01D4 // Watchpoint Control Register 5
+#define R5_DBG_WCR6	0x01D8 // Watchpoint Control Register 6
+#define R5_DBG_WCR7	0x01DC // Watchpoint Control Register 7
+#define R5_DBG_OSLSR	0x0304 // Operating System Lock Status Register
+#define R5_DBG_PRCR	0x0310 // Device Powerdown and Reset Control Reg
+#define R5_DBG_PRSR	0x0314 // Device Powerdown and Reset Status Reg
+#define R5_DBG_MIDR	0x0D00 // Main ID Register
+#define R5_DBG_CTR	0x0D04 // Cache Type Register
+#define R5_DBG_TCMTR	0x0D08 // TCM Type Register
+#define R5_DBG_MPUIR	0x0D10 // MPU Type Register
+#define R5_DBG_MPIDR	0x0D14 // Multiprocessor Affinity Register
+#define R5_DBG_ID_PFR0	0x0D20 // Processor Feature Register 0
+#define R5_DBG_ID_PFR1	0x0D24 // Processor Feature Register 1
+#define R5_DBG_ID_DFR0	0x0D28 // Debug Feature Register 0
+#define R5_DBG_ID_AFR0	0x0D2C // Auxiliary Feature Register 0
+#define R5_DBG_ID_MMFR0	0x0D30 // Memory Model Feature Register 0
+#define R5_DBG_ID_MMFR1	0x0D34 // Memory Model Feature Register 1
+#define R5_DBG_ID_MMFR2	0x0D38 // Memory Model Feature Register 2
+#define R5_DBG_ID_MMFR3	0x0D3C // Memory Model Feature Register 3
+#define R5_DBG_ID_ISAR0	0x0D40 // ISA Feature Register 0
+#define R5_DBG_ID_ISAR1	0x0D44 // ISA Feature Register 1
+#define R5_DBG_ID_ISAR2	0x0D48 // ISA Feature Register 2
+#define R5_DBG_ID_ISAR3	0x0D4C // ISA Feature Register 3
+#define R5_DBG_ID_ISAR4	0x0D50 // ISA Feature Register 4
+#define R5_DBG_ID_ISAR5	0x0D54 // ISA Feature Register 5
+#define R5_DBG_ETMIF	0x0ED8 // ETM Interface Integration Register
+#define R5_DBG_MISCOUT	0x0EF8 // Miscellaneous Outputs Integration Register
+#define R5_DBG_MISCIN	0x0EFC // Miscellaneous Inputs Integration Register
+#define R5_DBG_ITCTRL	0x0F00 // Integration Mode Control Register
+#define R5_DBG_CLAIMSET	0x0FA0 // Claim Tag Set Register
+#define R5_DBG_CLAIMCLR	0x0FA4 // Claim Tag Clear Register
+#define R5_DBG_LAR	0x0FB0 // Lock Access Register
+#define R5_DBG_LSR	0x0FB4 // Lock Status Register
+#define R5_DBG_AUTHSTATUS 0x0FB8 // Authentication Status Register
+#define R5_DBG_DEVID	0x0FC8 // Device Indentifier
+#define R5_DBG_DEVTYPE	0x0FCC // Device Type Register
+#define R5_DBG_PIDR4	0x0FD0 // Peripheral ID Register 4
+#define R5_DBG_PIDR5	0x0FD4 // Peripheral ID Register 5
+#define R5_DBG_PIDR6	0x0FD8 // Peripheral ID Register 6
+#define R5_DBG_PIDR7	0x0FDC // Peripheral ID Register 7
+#define R5_DBG_PIDR0	0x0FE0 // Peripheral ID Register 0
+#define R5_DBG_PIDR1	0x0FE4 // Peripheral ID Register 1
+#define R5_DBG_PIDR2	0x0FE8 // Peripheral ID Register 2
+#define R5_DBG_PIDR3	0x0FEC // Peripheral ID Register 3
+#define R5_DBG_CIDR0	0x0FF0 // Component ID Register 0
+#define R5_DBG_CIDR1	0x0FF4 // Component ID Register 1
+#define R5_DBG_CIDR2	0x0FF8 // Component ID Register 2
+#define R5_DBG_CIDR3	0x0FFC
+
+static unsigned dbg_r5_read_dscr(void *regs)
+{
+	return *(unsigned *)(regs + R5_DBG_DSCRext);
+}
+
+static void dbg_r5_write_dscr(void *regs, unsigned val)
+{
+	*(volatile unsigned *)(regs + R5_DBG_DSCRext) = val;
+}
+
+static void dbg_r5_write_drcr(void *regs, unsigned val)
+{
+	*(volatile unsigned *)(regs + R5_DBG_DRCR) = val;
+}
+
+static void dbg_r5_unlock_access(void *regs)
+{
+	*(volatile unsigned *)(regs + R5_DBG_LAR) = 0xc5acce55;
+}
+
+static void dbg_r5_halt_restart(void *regs, unsigned val)
+{
+	/* Request */
+	dbg_r5_write_drcr(regs, val);
+
+	while (1) {
+		unsigned dscr = dbg_r5_read_dscr(regs);
+		if (dscr & val)
+			return;
+		usleep(1);
+	}
+}
+
+static void dbg_r5_halt(void *regs)
+{
+	unsigned dscr = dbg_r5_read_dscr(regs);
+	if (dscr & 1) {
+		/* Already in debug state */
+		return;
+	}
+
+	/* Enable halting debug-mode */
+	dbg_r5_write_dscr(regs, dscr | (1 << 14));
+
+	dbg_r5_halt_restart(regs, 1);
+}
+
+static void dbg_r5_restart(void *regs)
+{
+	dbg_r5_halt_restart(regs, 2);
+}
+
+static unsigned dbg_r5_read_dcc(void *regs)
+{
+	/* Wait until TXfull is set */
+	while (!(dbg_r5_read_dscr(regs) & (1 << 29)))
+		usleep(1);
+
+	return *(volatile unsigned *)(regs + R5_DBG_DTRTXext);
+}
+
+static void dbg_r5_exec_insn(void *regs, unsigned insn)
+{
+	unsigned dscr;
+
+	/* Wait until InstrCompl is set */
+	while (1) {
+		dscr = dbg_r5_read_dscr(regs);
+		if (dscr & (1 << 24))
+			break;
+		usleep(1);
+	}
+
+	if (0) {
+		printf ("dscr: %08x\n", dscr);
+		/* Clear sticky pipeline advance */
+		dbg_r5_write_drcr(regs, (1 << 3));
+		printf ("dscr: %08x\n", dbg_r5_read_dscr(regs));
+	}
+
+	*(volatile unsigned *)(regs + R5_DBG_ITR) = insn;
+
+	/* Wait until InstrCompl is set */
+	while (!(dbg_r5_read_dscr(regs) & (1 << 24)))
+		usleep(1);
+}
+
+static unsigned dbg_r5_read_reg(void *regs, unsigned rd)
+{
+	/* MCR p14, 0, rd, c0, c5, 0 */
+	dbg_r5_exec_insn(regs, 0xee000e15 + (rd << 12));
+
+	return dbg_r5_read_dcc(regs);
+}
+
+static void dbg_r5_dump(void *regs)
+{
+	unsigned dscr = dbg_r5_read_dscr(regs);
+	printf ("DIDR: %08x\n", *(unsigned *)(regs + R5_DBG_DIDR));
+	printf ("WAFR: %08x\n", *(unsigned *)(regs + R5_DBG_WFAR));
+	printf ("DSCR: %08x\n", dscr);
+	printf ("LSR:  %08x\n", *(unsigned *)(regs + R5_DBG_LSR));
+	printf ("AUTHSTATUS: %08x\n", *(unsigned *)(regs + R5_DBG_AUTHSTATUS));
+
+	/* ITRen */
+	dbg_r5_write_dscr(regs, dscr | (1 << 13));
+
+	if (dscr & 1)
+		for (unsigned i = 0; i < 15; i++)
+			printf("R%02u: %08x\n", i, dbg_r5_read_reg(regs, i));
+}
+
+static void *zynqmp_map_dbg_r5(int fd, unsigned dbg_base)
+{
+	void *regs;
+
+	regs = mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_SHARED, fd, dbg_base);
+	if (regs == MAP_FAILED) {
+		printf("cannot mmap dbg regs: %m\n");
+		return NULL;
+	}
+	return regs;
+}
+
+static void zynqmp_dbg_dump(int fd, unsigned dbg_base)
+{
+	void *regs = zynqmp_map_dbg_r5(fd, dbg_base);
+	if (regs == NULL)
+		return;
+	dbg_r5_dump(regs);
+}
+
+static void zynqmp_dbg_halt(int fd, unsigned dbg_base)
+{
+	void *regs = zynqmp_map_dbg_r5(fd, dbg_base);
+	if (regs == NULL)
+		return;
+
+	dbg_r5_unlock_access(regs);
+
+	dbg_r5_halt(regs);
+}
+
+static void zynqmp_dbg_restart(int fd, unsigned dbg_base)
+{
+	void *regs = zynqmp_map_dbg_r5(fd, dbg_base);
+	if (regs == NULL)
+		return;
+	dbg_r5_restart(regs);
+}
+
 static void help_zynqmp_rpu(void)
 {
 	printf("usage: %s zynqmp-rpu\n", progname);
@@ -4380,6 +4620,15 @@ static int do_zynqmp_rpu(int argc, char *argv[])
 			/* Wakeup RPU 0 */
 			if (zynqmp_pm ("pm_request_wakeup 7 1 0 1\n") < 0)
 				return -1;
+		}
+		else if (strcmp(argv[i], "dbg0-dump") == 0) {
+			zynqmp_dbg_dump(fd, R5_DBG_0_BASEADDR);
+		}
+		else if (strcmp(argv[i], "dbg0-halt") == 0) {
+			zynqmp_dbg_halt(fd, R5_DBG_0_BASEADDR);
+		}
+		else if (strcmp(argv[i], "dbg0-restart") == 0) {
+			zynqmp_dbg_restart(fd, R5_DBG_0_BASEADDR);
 		}
 		else
 			printf ("unknown subcommand %s\n", argv[i]);
