@@ -2436,6 +2436,11 @@ struct gdb_packet {
 	size_t size;
 };
 
+static void gdb_packet_put_str(struct gdb_packet *out, const char *msg)
+{
+	out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX, "%s", msg);
+}
+
 struct dbg_port;
 
 typedef int (gdb_command_t)(struct dbg_port *dbg,
@@ -2707,6 +2712,61 @@ static void dbg_urv_pc_advance_4(struct dbg_port *dbg)
 	dbg_urv_exec_nop(dbg);
 }
 
+static void gdb_maybe_read_term(struct dbg_port *dbg)
+{
+	if (dbg->flag_term) {
+		while (1) {
+			int rx = wr_vuart_rx(board);
+			if (rx < 0)
+				break;
+			putchar(rx);
+		}
+		fflush(stdout);
+	}
+}
+
+static int gdb_maybe_stop(struct dbg_port *dbg)
+{
+	int ret;
+	struct pollfd p[2];
+
+	p[0].fd = dbg->fd;
+	p[0].events = POLLIN;
+	p[0].revents = 0;
+
+	if (dbg->flag_term) {
+		p[1].fd = 0;
+		p[1].events = POLLIN;
+		p[1].revents = 0;
+		ret = poll(p, 2, 100);
+	}
+	else
+		ret = poll(p, 1, 1000);
+
+	if (ret == 0) {
+		/* Timeout, continue */
+		return 0;
+	}
+
+	if (ret < 0) {
+		/* Error: connection closed ? */
+		return -1;
+	}
+
+	if (dbg->flag_term && (p[1].revents & POLLIN)) {
+		/* From stdin to cpu */
+		char c;
+		if (read(0, &c, 1) == 1)
+			wr_vuart_tx(board, c);
+	}
+
+	if (p[0].revents & POLLIN) {
+		return 1;
+	}
+
+	return 0;
+}
+
 /**
  * Continue command
  */
@@ -2722,18 +2782,9 @@ static int gdb_urv_handle_c(struct dbg_port *dbg,
 	dbg_urv_exec_insn(dbg, 0x00100073); /* ebreak */
 	while (1) {
 		int ret;
-		struct pollfd p[2];
 
 		/* Dump vuart. */
-		if (dbg->flag_term) {
-			while (1) {
-				int rx = wr_vuart_rx(board);
-				if (rx < 0)
-					break;
-				putchar(rx);
-			}
-			fflush(stdout);
-		}
+		gdb_maybe_read_term(dbg);
 
 		if (dbg_urv_in_debug_mode(dbg)) {
 			/*
@@ -2741,46 +2792,23 @@ static int gdb_urv_handle_c(struct dbg_port *dbg,
 			 * race if the ebreak is not yet executed
 			 */
 			if (dbg_urv_in_debug_mode(dbg)) {
-				out->size = snprintf(out->data,
-						     GDB_PACKET_SIZE_MAX,
-						     "S05");
+				gdb_packet_put_str(out, "S05");
 				break;
 			}
 		}
 
-		p[0].fd = dbg->fd;
-		p[0].events = POLLIN;
-		p[0].revents = 0;
-
-		if (dbg->flag_term) {
-			p[1].fd = 0;
-			p[1].events = POLLIN;
-			p[1].revents = 0;
-			ret = poll(p, 2, 100);
-		}
-		else
-			ret = poll(p, 1, 1000);
-
+		ret = gdb_maybe_stop(dbg);
+		if (ret < 0)
+			return ret;
 		if (ret == 0)
 			continue;
-		if (ret < 0)
-			break;
 
-		if (dbg->flag_term && (p[1].revents & POLLIN)) {
-			char c;
-			if (read(0, &c, 1) == 1)
-				wr_vuart_tx(board, c);
-		}
-		if (p[0].revents & POLLIN) {
-			/* GDB wants something from us */
-			ret = dbg_urv_debug_mode_force_set(dbg);
-			if (ret < 0)
-				fprintf(stderr, "Failed to set debug mode\n");
-			out->size = snprintf(out->data,
-					     GDB_PACKET_SIZE_MAX,
-					     "S02");
-			break;
-		}
+		/* GDB wants something from us */
+		ret = dbg_urv_debug_mode_force_set(dbg);
+		if (ret < 0)
+			fprintf(stderr, "Failed to set debug mode\n");
+		gdb_packet_put_str(out, "S02");
+		break;
 	}
 
 	return 0;
@@ -2794,7 +2822,7 @@ static int gdb_urv_handle_D(struct dbg_port *dbg,
 			    struct gdb_packet *in)
 {
 	dbg_urv_exec_insn(dbg, 0x00100073); /* ebreak */
-	out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX, "OK");
+	gdb_packet_put_str(out, "OK");
 
 	return 0;
 }
@@ -2804,6 +2832,12 @@ static void gdb_packet_append_x32(struct gdb_packet *out, uint32_t v)
 	out->size += snprintf(out->data + out->size,
 			      GDB_PACKET_SIZE_MAX,
 			      "%08"PRIx32, v);
+}
+
+static void gdb_packet_append_x8(struct gdb_packet *out, unsigned char v)
+{
+	out->size += snprintf(out->data + out->size,
+			      GDB_PACKET_SIZE_MAX, "%02x", v);
 }
 
 /**
@@ -2839,8 +2873,7 @@ static int gdb_urv_handle_G(struct dbg_port *dbg,
 	int i;
 
 	if (in->size != (1 + 33 * 8)) {
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "E01");
+		gdb_packet_put_str(out, "E01");
 		return 0;
 	}
 
@@ -2848,9 +2881,7 @@ static int gdb_urv_handle_G(struct dbg_port *dbg,
 		int ret = sscanf(in->data + 1 + i * 8, "%08"SCNx32, &regs[i]);
 
 		if (ret != 1) {
-			out->size = snprintf(out->data,
-					     GDB_PACKET_SIZE_MAX,
-					     "E02");
+			gdb_packet_put_str(out, "E02");
 			return 0;
 		}
 	}
@@ -2861,8 +2892,7 @@ static int gdb_urv_handle_G(struct dbg_port *dbg,
 
 	for (i = 1; i < 32; ++i)
 		dbg_urv_write_reg(dbg, i, ntohl(regs[i]));
-	out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-			     "OK");
+	gdb_packet_put_str(out, "OK");
 
 	return 0;
 }
@@ -2873,13 +2903,12 @@ static int gdb_urv_handle_G(struct dbg_port *dbg,
  * Partially supported
  */
 static int gdb_handle_H(struct dbg_port *dbg,
-			     struct gdb_packet *out,
-			     struct gdb_packet *in)
+			struct gdb_packet *out,
+			struct gdb_packet *in)
 {
 	/* we just want to keep GDB quiet */
 	if (strncmp(in->data, "Hg0", 3) == 0)
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "OK");
+		gdb_packet_put_str(out, "OK");
 	else
 		out->size = 0;
 
@@ -2915,21 +2944,18 @@ static int gdb_urv_handle_M(struct dbg_port *dbg,
 
 	indata = strchr(in->data, ':');
 	if (!indata) {
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "E01");
+		gdb_packet_put_str(out, "E01");
 		return 0;
 	}
 	indata++; /* skip ':' */
 	ret = sscanf(in->data + 1, "%"SCNx32",%"SCNx32":", &addr, &n);
 	if (ret != 2) {
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "E02");
+		gdb_packet_put_str(out, "E02");
 		return 0;
 	}
 
 	if (n * 2 != in->size - (indata - in->data)) {
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "E03");
+		gdb_packet_put_str(out, "E03");
 		return 0;
 	}
 
@@ -2968,11 +2994,9 @@ static int gdb_urv_handle_M(struct dbg_port *dbg,
 	dbg_urv_write_reg(dbg, 11, a1);
 
 	if (n > 0)
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "E04");
+		gdb_packet_put_str(out, "E04");
 	else
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "OK");
+		gdb_packet_put_str(out, "OK");
 
 	return 0;
 }
@@ -2990,8 +3014,7 @@ static int gdb_urv_handle_m(struct dbg_port *dbg,
 
 	ret = sscanf(in->data + 1, "%x,%x", &addr, &n);
 	if (ret != 2) {
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "E01");
+		gdb_packet_put_str(out, "E01");
 		return 0;
 	}
 	a0 = dbg_urv_read_reg(dbg, 10);
@@ -3036,8 +3059,7 @@ static int gdb_urv_handle_p(struct dbg_port *dbg,
 				     "%08x",
 				     (1 << 30) | (1 << ('I' - 65)));
 	else
-		out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX,
-				     "E01");
+		gdb_packet_put_str(out, "E01");
 
 	return 0;
 }
@@ -3080,11 +3102,9 @@ static int gdb_handle_qm(struct dbg_port *dbg,
 	return 0;
 }
 
-static int gdb_urv_handle_qRcmd(struct dbg_port *dbg,
-				struct gdb_packet *out,
-				struct gdb_packet *in)
+/* BUF length should be GDB_PACKET_SIZE_MAX / 2 */
+static int gdb_qRcmd_decode(char *buf, struct gdb_packet *in)
 {
-	char buf[GDB_PACKET_SIZE_MAX / 2];
 	unsigned len;
 
 	/* Decode hex input (convert to bytes). 6 is the prefix 'qRcmd,' */
@@ -3093,13 +3113,34 @@ static int gdb_urv_handle_qRcmd(struct dbg_port *dbg,
 		int ret;
 
 		ret = sscanf(in->data + 6 + len * 2, "%02x", &val);
-		if (ret != 1) {
-			out->size = 0;
-			return 0;
-		}
+		if (ret != 1)
+			return -1;
 		buf[len] = val;
 	}
 	buf[len] = 0;
+	return 0;
+}
+
+static void gdb_qRcmd_encode(char *buf, struct gdb_packet *out)
+{
+	unsigned len;
+
+	/* Encode to hex.  */
+	for (len = 0; buf[len]; len++)
+		sprintf(out->data + len * 2, "%02x", buf[len]);
+	out->size = len * 2;
+}
+
+static int gdb_urv_handle_qRcmd(struct dbg_port *dbg,
+				struct gdb_packet *out,
+				struct gdb_packet *in)
+{
+	char buf[GDB_PACKET_SIZE_MAX / 2];
+
+	if (gdb_qRcmd_decode(buf, in) < 0) {
+		out->size = 0;
+		return 0;
+	}
 
 	if (strcmp(buf, "help") == 0) {
 		strcpy(buf, "usage: csr | reset | port | help\n");
@@ -3143,9 +3184,7 @@ static int gdb_urv_handle_qRcmd(struct dbg_port *dbg,
 	}
 
 	/* Encode to hex.  */
-	for (len = 0; buf[len]; len++)
-		sprintf(out->data + len * 2, "%02x", buf[len]);
-	out->size = len * 2;
+	gdb_qRcmd_encode(buf, out);
 	return 0;
 }
 
@@ -4392,6 +4431,44 @@ static int zynqmp_init_rpu(int fd)
 #define R5_DBG_CIDR2	0x0FF8 // Component ID Register 2
 #define R5_DBG_CIDR3	0x0FFC
 
+struct bit_xlat_t {
+	const char *name;
+	unsigned bit;
+};
+
+static const struct bit_xlat_t dscr_xlat[] = {
+	{ "RXfull", 1 << 30 },
+	{ "TXfull", 1 << 29 },
+	{ "PipeAdv", 1 << 25 },
+	{ "InstrCompl", 1 << 24 },
+	{ "ExtDCCmode1", 1 << 21 },
+	{ "ExtDCCmode0", 1 << 20 },
+	{ "ADAdiscard", 1 << 19 },
+	{ "MDBgen", 1 << 15 },
+	{ "HDBGen", 1 << 14 },
+	{ "ITRen", 1 << 13 },
+	{ "UDCCdis", 1 << 12 },
+	{ "INTdis", 1 << 11 },
+	{ "DBGack", 1 << 10 },
+	{ "UND_I", 1 << 8 },
+	{ "ADABORT_I", 1 << 7 },
+	{ "SDABORT_I", 1 << 6 },
+	{ "MOE3", 1 << 5 },
+	{ "MOE2", 1 << 4 },
+	{ "MOE1", 1 << 3 },
+	{ "MOE0", 1 << 2 },
+	{ "RESTARTED", 1 << 1 },
+	{ "HALTED", 1 << 0 },
+	{ NULL, 0 }
+};
+
+static void disp_bits(const struct bit_xlat_t *xlat, uint32_t v)
+{
+	for (; xlat->name; xlat++)
+		if (v & xlat->bit)
+			printf(" %s", xlat->name);
+}
+
 static unsigned dbg_r5_read_dscr(void *regs)
 {
 	return *(unsigned *)(regs + R5_DBG_DSCRext);
@@ -4433,25 +4510,14 @@ static void dbg_r5_halt_restart(void *regs, unsigned val)
 	}
 }
 
-static void dbg_r5_halt(void *regs)
-{
-	unsigned dscr = dbg_r5_read_dscr(regs);
-	if (dscr & 1) {
-		/* Already in debug state */
-		return;
-	}
-
-	if (!(dscr & (1 << 14))) {
-		/* Enable halting debug-mode */
-		dbg_r5_write_dscr(regs, dscr | (1 << 14));
-	}
-
-	dbg_r5_halt_restart(regs, 1);
-}
-
 static void dbg_r5_restart(void *regs)
 {
 	dbg_r5_halt_restart(regs, 2);
+}
+
+static void dbg_r5_reset(void *regs)
+{
+	*(volatile unsigned *)(regs + R5_DBG_PRCR) |= 2;
 }
 
 static unsigned dbg_r5_read_dcc(void *regs)
@@ -4498,12 +4564,22 @@ static void dbg_r5_exec_insn(void *regs, unsigned insn)
 		usleep(1);
 }
 
-/* Read a reg, from 0 to 14 */
-static unsigned dbg_r5_read_reg(void *regs, unsigned rd)
+static void dbg_r5_exec_dcc_to_reg(void *regs, unsigned rd)
+{
+	/* MRC p14, 0, rd, c0, c5, 0 */
+	dbg_r5_exec_insn(regs, 0xee100e15 + (rd << 12));
+}
+
+static void dbg_r5_exec_reg_to_dcc(void *regs, unsigned rd)
 {
 	/* MCR p14, 0, rd, c0, c5, 0 */
 	dbg_r5_exec_insn(regs, 0xee000e15 + (rd << 12));
+}
 
+/* Read a reg, from 0 to 14 */
+static unsigned dbg_r5_read_reg(void *regs, unsigned rd)
+{
+	dbg_r5_exec_reg_to_dcc(regs, rd);
 	return dbg_r5_read_dcc(regs);
 }
 
@@ -4512,21 +4588,39 @@ static unsigned dbg_r5_read_pc_via_r0(void *regs)
 	/* mov r0, pc */
 	dbg_r5_exec_insn(regs, 0xe1a0000f);
 
-	/* MCR p14, 0, rd, c0, c5, 0 */
-	dbg_r5_exec_insn(regs, 0xee000e15 + (0 << 12));
+	dbg_r5_exec_reg_to_dcc(regs, 0);
 
 	return dbg_r5_read_dcc(regs);
 }
 
 static unsigned dbg_r5_read_cpsr_via_r0(void *regs)
 {
-	/* MRS, r0, CPSR */
+	/* MRS r0, CPSR */
 	dbg_r5_exec_insn(regs, 0xe10f0000);
 
-	/* MCR p14, 0, rd, c0, c5, 0 */
-	dbg_r5_exec_insn(regs, 0xee000e15 + (0 << 12));
+	dbg_r5_exec_reg_to_dcc(regs, 0);
 
 	return dbg_r5_read_dcc(regs);
+}
+
+static void dbg_r5_write_pc_via_r0(void *regs, uint32_t val)
+{
+	dbg_r5_write_dcc(regs, val);
+
+	dbg_r5_exec_dcc_to_reg(regs, 0);
+
+	/* mov r0, pc */
+	dbg_r5_exec_insn(regs, 0xe1a0000f);
+}
+
+static void dbg_r5_write_cpsr_via_r0(void *regs, uint32_t val)
+{
+	dbg_r5_write_dcc(regs, val);
+
+	dbg_r5_exec_dcc_to_reg(regs, 0);
+
+	/* msr CPSR, r0 */
+	dbg_r5_exec_insn(regs, 0xe129f002);
 }
 
 /* Write a reg, from 0 to 14 */
@@ -4534,8 +4628,45 @@ static void dbg_r5_write_reg(void *regs, unsigned rd, uint32_t val)
 {
 	dbg_r5_write_dcc(regs, val);
 
-	/* MRC p14, 0, rd, c0, c5, 0 */
-	dbg_r5_exec_insn(regs, 0xee100e15 + (rd << 12));
+	dbg_r5_exec_dcc_to_reg(regs, rd);
+}
+
+static void dbg_r5_halt(void *regs)
+{
+	unsigned dscr = dbg_r5_read_dscr(regs);
+	if (!(dscr & 1)) {
+		/* Not in debug state */
+
+		if (!(dscr & (1 << 14))) {
+			/* Enable halting debug-mode */
+			dbg_r5_write_dscr(regs, dscr | (1 << 14));
+		}
+
+		/* Request to halt */
+		dbg_r5_write_drcr(regs, 1);
+
+		while (1) {
+			dscr = dbg_r5_read_dscr(regs);
+			if (dscr & 1)
+				break;
+			usleep(1);
+		}
+	}
+
+	if (dscr & (1 << 29)) {
+		printf ("TXfull was set!\n");
+
+		*(volatile unsigned *)(regs + R5_DBG_DTRTXext);
+	}
+
+	if (dscr & (1 << 30)) {
+		unsigned r0;
+		printf ("RXfull was set!\n");
+
+		r0 = dbg_r5_read_reg (regs, 0);
+		dbg_r5_exec_dcc_to_reg(regs, 0);
+		dbg_r5_write_reg (regs, 0, r0);
+	}
 }
 
 static void dbg_r5_dump(void *regs)
@@ -4543,15 +4674,20 @@ static void dbg_r5_dump(void *regs)
 	unsigned dscr = dbg_r5_read_dscr(regs);
 	printf ("DIDR: %08x\n", *(unsigned *)(regs + R5_DBG_DIDR));
 	printf ("WAFR: %08x\n", *(unsigned *)(regs + R5_DBG_WFAR));
-	printf ("DSCR: %08x\n", dscr);
+	printf ("DSCR: %08x", dscr);
+	disp_bits(dscr_xlat, dscr);
+	printf ("\n");
 	printf ("LSR:  %08x\n", *(unsigned *)(regs + R5_DBG_LSR));
 	printf ("AUTHSTATUS: %08x\n", *(unsigned *)(regs + R5_DBG_AUTHSTATUS));
+	printf ("PRSR: %08x\n", *(unsigned *)(regs + R5_DBG_PRSR));
+	printf ("PRCR: %08x\n", *(unsigned *)(regs + R5_DBG_PRCR));
 
 	dbg_r5_enable_itr(regs);
 
-	if (dscr & 1)
+	if (dscr & 1) {
 		for (unsigned i = 0; i < 15; i++)
 			printf("R%02u: %08x\n", i, dbg_r5_read_reg(regs, i));
+	}
 }
 
 static void *zynqmp_map_dbg_r5(int fd, unsigned dbg_base)
@@ -4593,9 +4729,158 @@ static void zynqmp_dbg_restart(int fd, unsigned dbg_base)
 	dbg_r5_restart(regs);
 }
 
+static void zynqmp_dbg_reset(int fd, unsigned dbg_base)
+{
+	void *regs = zynqmp_map_dbg_r5(fd, dbg_base);
+	if (regs == NULL)
+		return;
+	dbg_r5_reset(regs);
+}
+
 static int gdb_r5_halt(struct dbg_port *dbg)
 {
 	dbg_r5_halt(dbg->dap);
+	return 0;
+}
+
+/**
+ * Write data to memory
+ */
+static int gdb_r5_handle_M(struct dbg_port *dbg,
+			   struct gdb_packet *out,
+			   struct gdb_packet *in)
+{
+	uint32_t addr, n;
+	uint32_t r0, r1;
+	char *indata;
+	int ret;
+
+	indata = strchr(in->data, ':');
+	if (!indata) {
+		gdb_packet_put_str(out, "E01");
+		return 0;
+	}
+	indata++; /* skip ':' */
+	ret = sscanf(in->data + 1, "%"SCNx32",%"SCNx32":", &addr, &n);
+	if (ret != 2) {
+		gdb_packet_put_str(out, "E02");
+		return 0;
+	}
+
+	if (n * 2 != in->size - (indata - in->data)) {
+		gdb_packet_put_str(out, "E03");
+		return 0;
+	}
+
+	r0 = dbg_r5_read_reg(dbg->dap, 0);
+	r1 = dbg_r5_read_reg(dbg->dap, 1);
+	dbg_r5_write_reg(dbg->dap, 0, addr);
+
+	if (addr % 4 == 0) {
+		for (; n >= 4; n -= 4, indata += 8) {
+			uint32_t w;
+
+			ret = sscanf(indata, "%08"SCNx32, &w);
+			if (ret != 1)
+				break;
+
+			dbg_r5_write_reg(dbg->dap, 1, ntohl(w));
+
+			/* str r1,[r0],#4 */
+			dbg_r5_exec_insn(dbg->dap, 0xe4801004);
+		}
+	}
+	for (; n > 0; --n, indata += 2) {
+		uint32_t b;
+
+		ret = sscanf(indata, "%02"SCNx32, &b);
+		if (ret != 1)
+			break;
+		dbg_r5_write_reg(dbg->dap, 1, b);
+		/* strb r1,[r0],#1 */
+		dbg_r5_exec_insn(dbg->dap, 0xe4c01001);
+	}
+
+	dbg_r5_write_reg(dbg->dap, 0, r0);
+	dbg_r5_write_reg(dbg->dap, 1, r1);
+
+	if (n > 0)
+		gdb_packet_put_str(out, "E04");
+	else
+		gdb_packet_put_str(out, "OK");
+
+	return 0;
+}
+
+/**
+ * Read data from memory
+ */
+static int gdb_r5_handle_m(struct dbg_port *dbg,
+			   struct gdb_packet *out,
+			   struct gdb_packet *in)
+{
+	uint32_t addr, n;
+	uint32_t r0, r1;
+	int ret;
+
+	ret = sscanf(in->data + 1, "%x,%x", &addr, &n);
+	if (ret != 2) {
+		gdb_packet_put_str(out, "E01");
+		return 0;
+	}
+	r0 = dbg_r5_read_reg(dbg->dap, 0);
+	r1 = dbg_r5_read_reg(dbg->dap, 1);
+	dbg_r5_write_reg(dbg->dap, 0, addr);
+	out->size = 0;
+	for (; n > 0; --n) {
+		uint8_t b;
+
+		/* ldrb r1,[r0],1 */
+		dbg_r5_exec_insn(dbg->dap, 0xe4d01001);
+
+		b = dbg_r5_read_reg(dbg->dap, 1);
+		gdb_packet_append_x8(out, b);
+	}
+
+	dbg_r5_write_reg(dbg->dap, 0, r0);
+	dbg_r5_write_reg(dbg->dap, 1, r1);
+
+	return 0;
+}
+
+/**
+ * Write all register
+ */
+static int gdb_r5_handle_G(struct dbg_port *dbg,
+			   struct gdb_packet *out,
+			   struct gdb_packet *in)
+{
+#define NBR_R5_REGS (16 + 3*8 + 1 + 1)
+	uint32_t regs[NBR_R5_REGS]; /* 16 regs, 8 fpa, fps, cpsr */
+	int i;
+
+	if (in->size != 1 + NBR_R5_REGS * 8) {
+		gdb_packet_put_str(out, "E01");
+		return 0;
+	}
+
+	for (i = 0; i < NBR_R5_REGS; ++i) {
+		int ret = sscanf(in->data + 1 + i * 8, "%08"SCNx32, &regs[i]);
+
+		if (ret != 1) {
+			gdb_packet_put_str(out, "E02");
+			return 0;
+		}
+	}
+
+	dbg_r5_write_pc_via_r0(dbg->dap, ntohl(regs[15]));
+	dbg_r5_write_cpsr_via_r0(dbg->dap, ntohl(regs[41]));
+
+	for (i = 1; i < 15; ++i)
+		dbg_r5_write_reg(dbg->dap, i, ntohl(regs[i]));
+
+	gdb_packet_put_str(out, "OK");
+
 	return 0;
 }
 
@@ -4607,11 +4892,22 @@ static int gdb_r5_handle_g(struct dbg_port *dbg,
 	unsigned i;
 
 	out->size = 0;
+
+	/* 0-15: regs */
 	for (i = 0; i < 15; ++i) {
 		regs[i] = dbg_r5_read_reg(dbg->dap, i);
 		gdb_packet_append_x32(out, htonl(regs[i]));
 	}
+
+	cpsr = dbg_r5_read_cpsr_via_r0(dbg->dap);
 	pc = dbg_r5_read_pc_via_r0(dbg->dap);
+
+	/* Adjust PC */
+	if (cpsr & (1 << 5))
+		pc -= 4; /* Thumb mode */
+	else
+		pc -= 8; /* ARM mode */
+	/* 15: PC */
 	gdb_packet_append_x32(out, htonl(pc));
 
 	/* 16-24: fp0-fp7 (96b) + fps (32b) */
@@ -4619,7 +4915,6 @@ static int gdb_r5_handle_g(struct dbg_port *dbg,
 		gdb_packet_append_x32(out, 0);
 
 	/* 25: cpsr */
-	cpsr = dbg_r5_read_cpsr_via_r0(dbg->dap);
 	gdb_packet_append_x32(out, htonl(cpsr));
 
 	/* Restore r0 */
@@ -4628,15 +4923,56 @@ static int gdb_r5_handle_g(struct dbg_port *dbg,
 	return 0;
 }
 
+/**
+ * Continue command
+ */
+static int gdb_r5_handle_c(struct dbg_port *dbg,
+			    struct gdb_packet *out,
+			    struct gdb_packet *in)
+{
+	if (in->size > 1) {
+		out->size = 0;
+		return 0;
+	}
+
+	dbg_r5_restart(dbg->dap);
+
+	while (1) {
+		int ret;
+
+		/* Dump vuart. */
+		gdb_maybe_read_term(dbg);
+
+		unsigned dscr = dbg_r5_read_dscr(dbg->dap);
+		if (dscr & 1) {
+			gdb_packet_put_str(out, "S05");
+			break;
+		}
+
+		ret = gdb_maybe_stop(dbg);
+		if (ret < 0)
+			return ret;
+		if (ret == 0)
+			continue;
+
+		/* GDB wants something from us */
+		dbg_r5_halt(dbg->dap);
+		gdb_packet_put_str(out, "S02");
+		break;
+	}
+
+	return 0;
+}
+
 static gdb_command_t * const gdb_r5_commands[] = {
-//	['c'] = gdb_urv_handle_c,
+	['c'] = gdb_r5_handle_c,
 //	['D'] = gdb_urv_handle_D,
 	['g'] = gdb_r5_handle_g,
-//	['G'] = gdb_urv_handle_G,
+	['G'] = gdb_r5_handle_G,
 	['H'] = gdb_handle_H,
 	['k'] = gdb_handle_k,
-//	['M'] = gdb_urv_handle_M,
-//	['m'] = gdb_urv_handle_m,
+	['M'] = gdb_r5_handle_M,
+	['m'] = gdb_r5_handle_m,
 //	['p'] = gdb_urv_handle_p,
 	['P'] = gdb_handle_P,
 	['q'] = gdb_handle_q,
@@ -4775,6 +5111,9 @@ static int do_zynqmp_rpu(int argc, char *argv[])
 		}
 		else if (strcmp(argv[i], "dbg0-restart") == 0) {
 			zynqmp_dbg_restart(fd, R5_DBG_0_BASEADDR);
+		}
+		else if (strcmp(argv[i], "dbg0-reset") == 0) {
+			zynqmp_dbg_reset(fd, R5_DBG_0_BASEADDR);
 		}
 		else if (strcmp(argv[i], "gdbserver") == 0) {
 			struct dbg_port dbg;
