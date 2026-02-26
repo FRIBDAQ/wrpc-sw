@@ -2436,6 +2436,12 @@ struct gdb_packet {
 	size_t size;
 };
 
+struct dbg_port;
+
+typedef int (gdb_command_t)(struct dbg_port *dbg,
+                            struct gdb_packet *out,
+                            struct gdb_packet *in);
+
 /**
  * struct dbg_port - descriptor to handle connection
  * @addr: Mock Turtle virtual address
@@ -2443,15 +2449,22 @@ struct gdb_packet {
  * @fd: socket file descriptor
  */
 struct dbg_port {
-	/* For debug */
+	/* Cpu index */
 	uint8_t cpu;
+	/* The fd for the stub socket */
 	int fd;
+	/* Set if -t (terminal) option was present */
         unsigned flag_term;
-};
 
-typedef int (gdb_command_t)(struct dbg_port *dbg,
-                            struct gdb_packet *out,
-                            struct gdb_packet *in);
+	/* Debug access port */
+	void *dap;
+
+	gdb_command_t * const *cmds;
+	size_t n_cmds;
+
+	/* If not NULL, called after connect to stop the target */
+	int (*post_connect_hook)(struct dbg_port *dbg);
+};
 
 /**
  * Read value from the Debug Port
@@ -2786,6 +2799,13 @@ static int gdb_urv_handle_D(struct dbg_port *dbg,
 	return 0;
 }
 
+static void gdb_packet_append_x32(struct gdb_packet *out, uint32_t v)
+{
+	out->size += snprintf(out->data + out->size,
+			      GDB_PACKET_SIZE_MAX,
+			      "%08"PRIx32, v);
+}
+
 /**
  * Read all registers
  */
@@ -2799,14 +2819,10 @@ static int gdb_urv_handle_g(struct dbg_port *dbg,
 	out->size = 0;
 	for (i = 0; i < 32; ++i) {
 		regs[i] = dbg_urv_read_reg(dbg, i);
-		out->size += snprintf(out->data + out->size,
-				      GDB_PACKET_SIZE_MAX,
-				      "%08"PRIx32, htonl(regs[i]));
+		gdb_packet_append_x32(out, htonl(regs[i]));
 	}
 	pc = dbg_urv_pc_read_via_ra(dbg);
-	out->size += snprintf(out->data + out->size,
-			      GDB_PACKET_SIZE_MAX,
-			      "%08"PRIx32, htonl(pc));
+	gdb_packet_append_x32(out, htonl(pc));
 	dbg_urv_write_reg(dbg, 1, regs[1]);
 
 	return 0;
@@ -3058,6 +3074,7 @@ static int gdb_handle_qm(struct dbg_port *dbg,
 			      struct gdb_packet *out,
 			      struct gdb_packet *in)
 {
+	/* Status: stopped */
 	out->size = snprintf(out->data, GDB_PACKET_SIZE_MAX, "S05");
 
 	return 0;
@@ -3132,7 +3149,8 @@ static int gdb_urv_handle_qRcmd(struct dbg_port *dbg,
 	return 0;
 }
 
-static int gdb_urv_handle_q(struct dbg_port *dbg,
+/* Generic handling of 'q*' commands */
+static int gdb_handle_q(struct dbg_port *dbg,
 			    struct gdb_packet *out,
 			    struct gdb_packet *in)
 {
@@ -3140,11 +3158,18 @@ static int gdb_urv_handle_q(struct dbg_port *dbg,
 		return gdb_handle_q_supported(dbg, out, in);
 	else if (strncmp(in->data, "qm", 2) == 0)
 		return gdb_handle_qm(dbg, out, in);
-	else if (strncmp(in->data, "qRcmd,", 6) == 0)
-		return gdb_urv_handle_qRcmd(dbg, out, in);
 	out->size = 0;
 
 	return 0;
+}
+
+static int gdb_urv_handle_q(struct dbg_port *dbg,
+			    struct gdb_packet *out,
+			    struct gdb_packet *in)
+{
+	if (strncmp(in->data, "qRcmd,", 6) == 0)
+		return gdb_urv_handle_qRcmd(dbg, out, in);
+	return gdb_handle_q(dbg, out, in);
 }
 
 /**
@@ -3283,15 +3308,15 @@ static int gdb_handle_v(struct dbg_port *dbg,
  * Not supported yet
  */
 static int gdb_handle_X(struct dbg_port *dbg,
-			     struct gdb_packet *out,
-			     struct gdb_packet *in)
+			struct gdb_packet *out,
+			struct gdb_packet *in)
 {
 	out->size = 0;
 
 	return 0;
 }
 
-static gdb_command_t * const gdb_urv_packet_exec[] = {
+static gdb_command_t * const gdb_urv_commands[] = {
 	['c'] = gdb_urv_handle_c,
 	['D'] = gdb_urv_handle_D,
 	['g'] = gdb_urv_handle_g,
@@ -3330,15 +3355,16 @@ static int gdb_command(struct dbg_port *dbg,
 	if (in->size == 0)
 		return -1;
 
-	exec = gdb_urv_packet_exec[cmd];
-	if (exec)
-		return exec(dbg, out, in);
+	if (cmd < dbg->n_cmds) {
+		exec = dbg->cmds[cmd];
+		if (exec)
+			return exec(dbg, out, in);
+	}
 	out->size = 0;
 	return 0;
 }
 
-static void debugger_print_packet(struct gdb_packet *pkt,
-				       const char *dir)
+static void debugger_print_packet(struct gdb_packet *pkt, const char *dir)
 {
 	int i, start, end;
 
@@ -3541,10 +3567,12 @@ static int debugger_run(struct dbg_port *dbg)
 	in = &pkt[0];
 	out = &pkt[1];
 
-	ret = dbg_urv_debug_mode_force_set(dbg);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to set debug mode\n");
-		return -1;
+	if (dbg->post_connect_hook) {
+		ret = dbg->post_connect_hook(dbg);
+		if (ret < 0) {
+			fprintf(stderr, "Failed to set debug mode\n");
+			return -1;
+		}
 	}
 
 	fputs("Start receiving messages from GDB\n", stdout);
@@ -3579,33 +3607,19 @@ static int debugger_run(struct dbg_port *dbg)
 	return 0;
 }
 
-static void help_gdbserver(void)
-{
-	fprintf(stderr, "usage: %s gdbserver BOARD-OPTIONS [options]\n",
-		progname);
-	fprintf(stderr, " -p PORT       listen on tcp port PORT\n");
-	fprintf(stderr, " -v            verbose\n");
-	fprintf(stderr, " -t            enable terminal\n");
-	fprintf(stderr, " -k            keep connection\n");
-}
-
 #define MEMPATH_LEN 128
 
-static int do_gdbserver(int argc, char *argv[])
+static int gdb_server(struct dbg_port *dbg, int argc, char *argv[])
 {
 	int flag_keep = 0;
 	int gdb_port = 7471;
 	int c, ret, sfd, ret_exit = EXIT_SUCCESS, optval;
-	struct dbg_port dbg;
 	struct sockaddr_in server_addr;
 	struct sockaddr_in client_addr;
 	socklen_t client_len = sizeof(client_addr);
 
-        /* Decode board options and open the board. */
-        if (board_open(&argc, argv) < 0)
-          return 1;
+	dbg->flag_term = 0;
 
-	memset(&dbg, 0, sizeof(dbg));
 	while ((c = getopt(argc, argv, "p:vstk")) != -1) {
 		switch (c) {
 		case 'p':
@@ -3622,7 +3636,7 @@ static int do_gdbserver(int argc, char *argv[])
                         flag_keep = 1;
 			break;
 		case 't':
-			dbg.flag_term = 1;
+			dbg->flag_term = 1;
 			break;
 		case '?':
                         printf("%s: unknown option, try -h\n", argv[0]);
@@ -3668,9 +3682,9 @@ static int do_gdbserver(int argc, char *argv[])
 	do {
 		printf ("Waiting for connection on port %d\n", gdb_port);
 
-		dbg.fd = accept(sfd, (struct sockaddr *)&client_addr,
+		dbg->fd = accept(sfd, (struct sockaddr *)&client_addr,
 				&client_len);
-		if (dbg.fd < 0) {
+		if (dbg->fd < 0) {
 			fprintf(stderr, "Failed to accept: %s\n",
 				strerror(errno));
 			ret_exit = EXIT_FAILURE;
@@ -3679,7 +3693,7 @@ static int do_gdbserver(int argc, char *argv[])
 		fprintf(stdout, "Accepted connection from %s\n",
 			inet_ntoa(client_addr.sin_addr));
 
-		ret = debugger_run(&dbg);
+		ret = debugger_run(dbg);
 		if (ret < 0) {
 			ret_exit = EXIT_FAILURE;
                         break;
@@ -3689,8 +3703,36 @@ static int do_gdbserver(int argc, char *argv[])
 out_bind:
 out_sock:
 	close(sfd);
-        board->fini(board);
         return ret_exit;
+}
+
+static void help_gdbserver(void)
+{
+	fprintf(stderr, "usage: %s gdbserver BOARD-OPTIONS [options]\n",
+		progname);
+	fprintf(stderr, " -p PORT       listen on tcp port PORT\n");
+	fprintf(stderr, " -v            verbose\n");
+	fprintf(stderr, " -t            enable terminal\n");
+	fprintf(stderr, " -k            keep connection\n");
+}
+
+static int do_gdbserver(int argc, char *argv[])
+{
+	int ret;
+	struct dbg_port dbg;
+
+        /* Decode board options and open the board. */
+        if (board_open(&argc, argv) < 0)
+          return 1;
+
+	dbg.cmds = gdb_urv_commands;
+	dbg.n_cmds = sizeof(gdb_urv_commands) / sizeof(gdb_urv_commands[0]);
+	dbg.post_connect_hook = dbg_urv_debug_mode_force_set;
+
+	ret = gdb_server(&dbg, argc, argv);
+
+        board->fini(board);
+        return ret;
 }
 
 #ifndef SUPPORT_WRS
@@ -4370,6 +4412,14 @@ static void dbg_r5_unlock_access(void *regs)
 	*(volatile unsigned *)(regs + R5_DBG_LAR) = 0xc5acce55;
 }
 
+static void dbg_r5_enable_itr(void *regs)
+{
+	unsigned dscr = dbg_r5_read_dscr(regs);
+
+	/* ITRen */
+	dbg_r5_write_dscr(regs, dscr | (1 << 13));
+}
+
 static void dbg_r5_halt_restart(void *regs, unsigned val)
 {
 	/* Request */
@@ -4391,8 +4441,10 @@ static void dbg_r5_halt(void *regs)
 		return;
 	}
 
-	/* Enable halting debug-mode */
-	dbg_r5_write_dscr(regs, dscr | (1 << 14));
+	if (!(dscr & (1 << 14))) {
+		/* Enable halting debug-mode */
+		dbg_r5_write_dscr(regs, dscr | (1 << 14));
+	}
 
 	dbg_r5_halt_restart(regs, 1);
 }
@@ -4409,6 +4461,15 @@ static unsigned dbg_r5_read_dcc(void *regs)
 		usleep(1);
 
 	return *(volatile unsigned *)(regs + R5_DBG_DTRTXext);
+}
+
+static void dbg_r5_write_dcc(void *regs, uint32_t val)
+{
+	/* Wait until RXfull is empty */
+	while (dbg_r5_read_dscr(regs) & (1 << 30))
+		usleep(1);
+
+	*(volatile unsigned *)(regs + R5_DBG_DTRRXext) = val;
 }
 
 static void dbg_r5_exec_insn(void *regs, unsigned insn)
@@ -4437,12 +4498,44 @@ static void dbg_r5_exec_insn(void *regs, unsigned insn)
 		usleep(1);
 }
 
+/* Read a reg, from 0 to 14 */
 static unsigned dbg_r5_read_reg(void *regs, unsigned rd)
 {
 	/* MCR p14, 0, rd, c0, c5, 0 */
 	dbg_r5_exec_insn(regs, 0xee000e15 + (rd << 12));
 
 	return dbg_r5_read_dcc(regs);
+}
+
+static unsigned dbg_r5_read_pc_via_r0(void *regs)
+{
+	/* mov r0, pc */
+	dbg_r5_exec_insn(regs, 0xe1a0000f);
+
+	/* MCR p14, 0, rd, c0, c5, 0 */
+	dbg_r5_exec_insn(regs, 0xee000e15 + (0 << 12));
+
+	return dbg_r5_read_dcc(regs);
+}
+
+static unsigned dbg_r5_read_cpsr_via_r0(void *regs)
+{
+	/* MRS, r0, CPSR */
+	dbg_r5_exec_insn(regs, 0xe10f0000);
+
+	/* MCR p14, 0, rd, c0, c5, 0 */
+	dbg_r5_exec_insn(regs, 0xee000e15 + (0 << 12));
+
+	return dbg_r5_read_dcc(regs);
+}
+
+/* Write a reg, from 0 to 14 */
+static void dbg_r5_write_reg(void *regs, unsigned rd, uint32_t val)
+{
+	dbg_r5_write_dcc(regs, val);
+
+	/* MRC p14, 0, rd, c0, c5, 0 */
+	dbg_r5_exec_insn(regs, 0xee100e15 + (rd << 12));
 }
 
 static void dbg_r5_dump(void *regs)
@@ -4454,8 +4547,7 @@ static void dbg_r5_dump(void *regs)
 	printf ("LSR:  %08x\n", *(unsigned *)(regs + R5_DBG_LSR));
 	printf ("AUTHSTATUS: %08x\n", *(unsigned *)(regs + R5_DBG_AUTHSTATUS));
 
-	/* ITRen */
-	dbg_r5_write_dscr(regs, dscr | (1 << 13));
+	dbg_r5_enable_itr(regs);
 
 	if (dscr & 1)
 		for (unsigned i = 0; i < 15; i++)
@@ -4500,6 +4592,60 @@ static void zynqmp_dbg_restart(int fd, unsigned dbg_base)
 		return;
 	dbg_r5_restart(regs);
 }
+
+static int gdb_r5_halt(struct dbg_port *dbg)
+{
+	dbg_r5_halt(dbg->dap);
+	return 0;
+}
+
+static int gdb_r5_handle_g(struct dbg_port *dbg,
+			   struct gdb_packet *out,
+			   struct gdb_packet *in)
+{
+	uint32_t regs[15], pc, cpsr;
+	unsigned i;
+
+	out->size = 0;
+	for (i = 0; i < 15; ++i) {
+		regs[i] = dbg_r5_read_reg(dbg->dap, i);
+		gdb_packet_append_x32(out, htonl(regs[i]));
+	}
+	pc = dbg_r5_read_pc_via_r0(dbg->dap);
+	gdb_packet_append_x32(out, htonl(pc));
+
+	/* 16-24: fp0-fp7 (96b) + fps (32b) */
+	for (i = 0; i < 8 * 3 + 1; i++)
+		gdb_packet_append_x32(out, 0);
+
+	/* 25: cpsr */
+	cpsr = dbg_r5_read_cpsr_via_r0(dbg->dap);
+	gdb_packet_append_x32(out, htonl(cpsr));
+
+	/* Restore r0 */
+	dbg_r5_write_reg(dbg->dap, 0, regs[0]);
+
+	return 0;
+}
+
+static gdb_command_t * const gdb_r5_commands[] = {
+//	['c'] = gdb_urv_handle_c,
+//	['D'] = gdb_urv_handle_D,
+	['g'] = gdb_r5_handle_g,
+//	['G'] = gdb_urv_handle_G,
+	['H'] = gdb_handle_H,
+	['k'] = gdb_handle_k,
+//	['M'] = gdb_urv_handle_M,
+//	['m'] = gdb_urv_handle_m,
+//	['p'] = gdb_urv_handle_p,
+	['P'] = gdb_handle_P,
+	['q'] = gdb_handle_q,
+//	['s'] = gdb_urv_handle_s,
+	['v'] = gdb_handle_v,
+	['v'] = gdb_handle_v,
+	['X'] = gdb_handle_X,
+	['?'] = gdb_handle_qm,
+};
 
 static void help_zynqmp_rpu(void)
 {
@@ -4629,6 +4775,24 @@ static int do_zynqmp_rpu(int argc, char *argv[])
 		}
 		else if (strcmp(argv[i], "dbg0-restart") == 0) {
 			zynqmp_dbg_restart(fd, R5_DBG_0_BASEADDR);
+		}
+		else if (strcmp(argv[i], "gdbserver") == 0) {
+			struct dbg_port dbg;
+
+			dbg.dap = zynqmp_map_dbg_r5(fd, R5_DBG_0_BASEADDR);
+			if (dbg.dap == NULL)
+				return -1;
+
+			dbg_r5_unlock_access(dbg.dap);
+			dbg_r5_enable_itr(dbg.dap);
+
+			dbg.cmds = gdb_r5_commands;
+			dbg.n_cmds = sizeof(gdb_r5_commands)
+				/ sizeof(gdb_r5_commands[0]);
+			dbg.post_connect_hook = gdb_r5_halt;
+
+			gdb_server(&dbg, argc - i, argv + i);
+			i = argc;
 		}
 		else
 			printf ("unknown subcommand %s\n", argv[i]);
