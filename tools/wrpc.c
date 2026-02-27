@@ -4484,6 +4484,16 @@ static void dbg_r5_write_drcr(void *regs, unsigned val)
 	*(volatile unsigned *)(regs + R5_DBG_DRCR) = val;
 }
 
+static void dbg_r5_write_vcr(void *regs, unsigned val)
+{
+	*(volatile unsigned *)(regs + R5_DBG_VCR) = val;
+}
+
+static void dbg_r5_write_dsccr(void *regs, unsigned val)
+{
+	*(volatile unsigned *)(regs + R5_DBG_DSCCR) = val;
+}
+
 static void dbg_r5_unlock_access(void *regs)
 {
 	*(volatile unsigned *)(regs + R5_DBG_LAR) = 0xc5acce55;
@@ -4576,6 +4586,12 @@ static void dbg_r5_exec_reg_to_dcc(void *regs, unsigned rd)
 	dbg_r5_exec_insn(regs, 0xee000e15 + (rd << 12));
 }
 
+static void dbg_r5_exec_iciallu(void *regs)
+{
+	/* MCR p15, 0, r0, cr7, cr5, 0 */
+	dbg_r5_exec_insn(regs, 0xee070f15);
+}
+
 /* Read a reg, from 0 to 14 */
 static unsigned dbg_r5_read_reg(void *regs, unsigned rd)
 {
@@ -4609,8 +4625,8 @@ static void dbg_r5_write_pc_via_r0(void *regs, uint32_t val)
 
 	dbg_r5_exec_dcc_to_reg(regs, 0);
 
-	/* mov r0, pc */
-	dbg_r5_exec_insn(regs, 0xe1a0000f);
+	/* mov pc, r0 */
+	dbg_r5_exec_insn(regs, 0xe1a0f000);
 }
 
 static void dbg_r5_write_cpsr_via_r0(void *regs, uint32_t val)
@@ -4620,7 +4636,7 @@ static void dbg_r5_write_cpsr_via_r0(void *regs, uint32_t val)
 	dbg_r5_exec_dcc_to_reg(regs, 0);
 
 	/* msr CPSR, r0 */
-	dbg_r5_exec_insn(regs, 0xe129f002);
+	dbg_r5_exec_insn(regs, 0xe129f000);
 }
 
 /* Write a reg, from 0 to 14 */
@@ -4876,7 +4892,7 @@ static int gdb_r5_handle_G(struct dbg_port *dbg,
 	dbg_r5_write_pc_via_r0(dbg->dap, ntohl(regs[15]));
 	dbg_r5_write_cpsr_via_r0(dbg->dap, ntohl(regs[41]));
 
-	for (i = 1; i < 15; ++i)
+	for (i = 0; i < 15; ++i)
 		dbg_r5_write_reg(dbg->dap, i, ntohl(regs[i]));
 
 	gdb_packet_put_str(out, "OK");
@@ -4923,6 +4939,49 @@ static int gdb_r5_handle_g(struct dbg_port *dbg,
 	return 0;
 }
 
+static const char * const xlat_moe[] = {
+	"halt", "bp", "0010", "bkpt",
+	"RQm", "0101", "0110", "0111",
+	"1000", "1001", "wp", "1011",
+	"1100", "1101", "1110", "1111" };
+
+static void dbg_disp_dscr(unsigned dscr)
+{
+	unsigned moe = (dscr >> 2) & 0x0f;
+	printf("dscr: %08x, moe:%s", dscr, xlat_moe[moe]);
+	disp_bits(dscr_xlat, dscr);
+}
+
+static const char * const xlat_cpsr_mode[] = {
+	"user", "fiq", "irq", "scv",
+	"0100", "0101", "mon", "abt",
+	"1000", "1001", "hyp", "und",
+	"1100", "1101", "1110", "sys"
+};
+
+static void dbg_disp_cpsr(unsigned cpsr)
+{
+	printf ("cpsr: %08x, mode: %s\n", cpsr, xlat_cpsr_mode[cpsr & 0x0f]);
+}
+
+static void gdb_disp_halt_state(struct dbg_port *dbg, unsigned dscr)
+{
+	unsigned r0;
+	unsigned cpsr;
+	unsigned pc;
+
+	dbg_disp_dscr(dscr);
+	printf("\n");
+	r0 = dbg_r5_read_reg(dbg->dap, 0);
+
+	cpsr = dbg_r5_read_cpsr_via_r0(dbg->dap);
+	dbg_disp_cpsr(cpsr);
+	pc = dbg_r5_read_pc_via_r0(dbg->dap);
+	printf("raw pc: %08x\n", pc);
+
+	dbg_r5_write_reg(dbg->dap, 0, r0);
+}
+
 /**
  * Continue command
  */
@@ -4935,6 +4994,9 @@ static int gdb_r5_handle_c(struct dbg_port *dbg,
 		return 0;
 	}
 
+	/* Invalidate I cache */
+	dbg_r5_exec_iciallu(dbg->dap);
+
 	dbg_r5_restart(dbg->dap);
 
 	while (1) {
@@ -4945,6 +5007,10 @@ static int gdb_r5_handle_c(struct dbg_port *dbg,
 
 		unsigned dscr = dbg_r5_read_dscr(dbg->dap);
 		if (dscr & 1) {
+			if (verbose) {
+				printf("target halted\n");
+				gdb_disp_halt_state(dbg, dscr);
+			}
 			gdb_packet_put_str(out, "S05");
 			break;
 		}
@@ -4964,9 +5030,60 @@ static int gdb_r5_handle_c(struct dbg_port *dbg,
 	return 0;
 }
 
+static int gdb_r5_handle_qRcmd(struct dbg_port *dbg,
+			       struct gdb_packet *out,
+			       struct gdb_packet *in)
+{
+	char buf[GDB_PACKET_SIZE_MAX / 2];
+
+	if (gdb_qRcmd_decode(buf, in) < 0) {
+		out->size = 0;
+		return 0;
+	}
+
+	if (strcmp(buf, "help") == 0) {
+		strcpy(buf, "usage: reset | help\n");
+	}
+	else if (strcmp(buf, "reset") == 0) {
+		/* svc mode, mask IRQ, FIQ, ASABORT */
+		dbg_r5_write_cpsr_via_r0(dbg->dap, 0x1d3);
+		strcpy(buf, "cpsr initialized\n");
+	}
+	else {
+		strcpy(buf,"unhandled mon command, try 'mon help'\n");
+	}
+
+	/* Encode to hex.  */
+	gdb_qRcmd_encode(buf, out);
+	return 0;
+}
+
+static int gdb_r5_handle_q(struct dbg_port *dbg,
+			   struct gdb_packet *out,
+			   struct gdb_packet *in)
+{
+	if (strncmp(in->data, "qRcmd,", 6) == 0)
+		return gdb_r5_handle_qRcmd(dbg, out, in);
+	return gdb_handle_q(dbg, out, in);
+}
+
+static int gdb_r5_handle_D(struct dbg_port *dbg,
+			   struct gdb_packet *out,
+			   struct gdb_packet *in)
+{
+	/* Invalidate I cache */
+	dbg_r5_exec_iciallu(dbg->dap);
+
+	dbg_r5_write_vcr(dbg->dap, 0);
+	dbg_r5_restart(dbg->dap);
+	gdb_packet_put_str(out, "OK");
+
+	return 0;
+}
+
 static gdb_command_t * const gdb_r5_commands[] = {
 	['c'] = gdb_r5_handle_c,
-//	['D'] = gdb_urv_handle_D,
+	['D'] = gdb_r5_handle_D,
 	['g'] = gdb_r5_handle_g,
 	['G'] = gdb_r5_handle_G,
 	['H'] = gdb_handle_H,
@@ -4975,7 +5092,7 @@ static gdb_command_t * const gdb_r5_commands[] = {
 	['m'] = gdb_r5_handle_m,
 //	['p'] = gdb_urv_handle_p,
 	['P'] = gdb_handle_P,
-	['q'] = gdb_handle_q,
+	['q'] = gdb_r5_handle_q,
 //	['s'] = gdb_urv_handle_s,
 	['v'] = gdb_handle_v,
 	['v'] = gdb_handle_v,
@@ -5124,6 +5241,12 @@ static int do_zynqmp_rpu(int argc, char *argv[])
 
 			dbg_r5_unlock_access(dbg.dap);
 			dbg_r5_enable_itr(dbg.dap);
+
+			/* Catch undefined, svc, prefetch, data */
+			dbg_r5_write_vcr(dbg.dap, 0x1e);
+
+			/* For write-through */
+			dbg_r5_write_dsccr(dbg.dap, 0);
 
 			dbg.cmds = gdb_r5_commands;
 			dbg.n_cmds = sizeof(gdb_r5_commands)
