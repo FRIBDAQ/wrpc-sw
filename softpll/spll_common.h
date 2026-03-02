@@ -51,7 +51,7 @@ typedef struct {
 	unsigned delock_samples;
 	
 	unsigned threshold;	/* Error threshold */
-	unsigned char locked;	/* Non-zero: we are locked */
+	unsigned locked;	/* Non-zero: locked (must be 32b for snmp) */
 	unsigned char lock_changed;
 } spll_lock_det_t;
 

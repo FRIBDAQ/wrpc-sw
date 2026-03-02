@@ -146,6 +146,8 @@ static inline void sequencing_fsm(struct softpll_state *s)
 					/* Once the DAC are on and stable,
 					   start helper PLL */
 					helper_start(&s->helper);
+#else
+					s->helper.ld.locked = 1;
 #endif
 					s->seq_state = SEQ_WAIT_HELPER;
 				}

@@ -43,7 +43,7 @@ struct spll_main_state {
 	int adder_ref, adder_out;
 	int tag_ref, tag_ref_d;
 	int tag_out, tag_out_d;
-	unsigned char locked; // locked flag
+	unsigned locked; // locked flag (must be 32b for snmp)
 	unsigned char rxpi_ready;
 	unsigned char enabled;
 	unsigned char link_up;
