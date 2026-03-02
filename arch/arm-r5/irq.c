@@ -11,6 +11,11 @@
 #include <stdint.h>
 #include "pp-printf.h"
 
+/* 121: PL_PS_Group0[0],
+   136: PL_PS_Group1[0] */
+#define SPLL_IRQ 121
+
+
 /* CPSR bits */
 #define R5_CPSR_FIQ (1<<6)
 #define R5_CPSR_IRQ (1<<7)
@@ -31,11 +36,22 @@
 #define ICCRPR	   *((uint32_t *)(RCPU_GIC + 0x1014)) //Running priority
 #define ICCHPIR	   *((uint32_t *)(RCPU_GIC + 0x1018)) //Highest pending int
 
-#define PL_IRQ 121
+static uint32_t
+read_mpidr(void)
+{
+    unsigned val;
+
+    /*                P   op1, rt, CRn, CRm, op2 */
+    asm volatile("mrc 15, 0,   %0, c0,  c0, 5" : "=r" (val));
+
+    return val;
+}
 
 void
 init_irq(void)
 {
+    unsigned cpu;
+
     /* Disable GIC distributor */
     ICDDCR = 0;
 
@@ -46,22 +62,23 @@ init_irq(void)
     ICCPMR = 0xff;
 
     /* Disable interrupt */
-    ICDIPTR(PL_IRQ / 4) &= ~(0x3 << (8 * (PL_IRQ & 0x3)));
-    ICDICER(PL_IRQ / 32) = 1 << (PL_IRQ & 0x1f);
+    ICDIPTR(SPLL_IRQ / 4) &= ~(0x3 << (8 * (SPLL_IRQ & 0x3)));
+    ICDICER(SPLL_IRQ / 32) = 1 << (SPLL_IRQ & 0x1f);
 
     /* Set sensitivity to level (00) */
-    ICDICFR(PL_IRQ / 16) &= ~(0x3 << (2 * (PL_IRQ & 0x0f)));
-    ICDICFR(PL_IRQ / 16) |= 0 << (2 * (PL_IRQ & 0x0f));
+    ICDICFR(SPLL_IRQ / 16) &= ~(0x3 << (2 * (SPLL_IRQ & 0x0f)));
+    ICDICFR(SPLL_IRQ / 16) |= 0 << (2 * (SPLL_IRQ & 0x0f));
 
     /* Set priority */
-    ICDIPR(PL_IRQ / 4) &= ~(0xff << (8 * (PL_IRQ & 0x03)));
-    ICDIPR(PL_IRQ / 4) |= 0xf0 << (8 * (PL_IRQ & 0x03));
+    ICDIPR(SPLL_IRQ / 4) &= ~(0xff << (8 * (SPLL_IRQ & 0x03)));
+    ICDIPR(SPLL_IRQ / 4) |= 0xf0 << (8 * (SPLL_IRQ & 0x03));
 
-    /* Target CPU #0 */
-    ICDIPTR(PL_IRQ / 4) |= 1 << (8 * (PL_IRQ & 0x3));
+    /* Target my CPU */
+    cpu = read_mpidr() & 0xff;
+    ICDIPTR(SPLL_IRQ / 4) |= (1 << cpu) << (8 * (SPLL_IRQ & 0x3));
 
     /* Enable */
-    ICDISER(PL_IRQ / 32) = 1 << (PL_IRQ & 0x1f);
+    ICDISER(SPLL_IRQ / 32) = 1 << (SPLL_IRQ & 0x1f);
 
     /* Enable distributor */
     ICDDCR = 1;
