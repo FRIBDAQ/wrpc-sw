@@ -563,8 +563,8 @@ void spll_show_stats(void)
 	{
 		/* Needs several pp_printf to avoid buffer overflow on printf
 		   buffer. */
-		pp_printf("irqs:%d "
-			  "ext-align:%d MFL%d MPL%d MY:%d DelCnt:%d setp:%d refcnt:%d tagcnt:%d m_kp:%d m_ki:%d m_sh:%d",
+		pp_printf("irqs:%u "
+			  "ext-align:%d MFL%d MPL%d MY:%d DelCnt:%u setp:%d refcnt:%u tagcnt:%u m_kp:%d m_ki:%d m_sh:%d",
 			  s->irq_count, s->ext.align_state,
 			  s->mpll.freq_ld.locked, s->mpll.phase_ld.locked,
 			  s->mpll.pi.y,
