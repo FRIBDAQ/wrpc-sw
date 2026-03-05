@@ -81,7 +81,7 @@ struct tool_base {
 	const char *name;
         const char *short_help;
 	int (*run)(int argc, char *argv[]);
-	void (*help)(void);
+	void (*help)(const char *cmd);
 };
 
 struct board {
@@ -89,8 +89,16 @@ struct board {
 	int (*init)(struct board *board, int *argc, char *argv[]);
 	int (*fini)(struct board *board);
 	void (*help)(void);
+
+	/* Read/Write to the ptp core register at OFF */
 	uint32_t (*readl)(struct board *board, unsigned off);
 	void (*writel)(struct board *board, unsigned off, uint32_t v);
+
+	/* Map 4KB of the local bus at address ADDR, for ZynqUS+ only.
+	   The previous map (if present) is invalidated.
+	   TODO: handle multiple map ?  handle other processor ?  */
+	void *(*map)(struct board *board, unsigned addr);
+	void (*unmap)(struct board *board);
 };
 
 static struct board *board;
@@ -115,6 +123,7 @@ struct board_mem {
 	struct board parent;
 	volatile void *base;
 	int is_be;
+	/* Virtual address of the PTP core */
 	void *map_addr;
 	unsigned map_length;
 };
@@ -180,31 +189,43 @@ static int parse_pci_slot(struct pci_slot *res, const char *s)
 	return 0;
 }
 
-static int board_pci_common_open(struct board_pci *board)
+static void *pci_map_resource(const char *resource_file,
+			      unsigned off, unsigned len)
 {
 	int fd;
+	void *res;
+
+	fd = open(resource_file, O_RDWR | O_SYNC);
+	if (fd < 0) {
+		fprintf(stderr, "cannot open resource file '%s': %s\n",
+			resource_file, strerror(errno));
+		return NULL;
+	}
+
+	res = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, off);
+	if (res == MAP_FAILED) {
+		fprintf(stderr, "cannot map resource file '%s': %s\n",
+			resource_file, strerror(errno));
+		close(fd);
+		return NULL;
+	}
+	close(fd);
+
+	return res;
+}
+
+static int board_pci_common_open(struct board_pci *board)
+{
 	unsigned pg = getpagesize();
 	unsigned pa_offset;
 
-	fd = open(board->resource_file, O_RDWR | O_SYNC);
-	if (fd < 0) {
-		fprintf(stderr, "cannot open resource file '%s': %s\n",
-			board->resource_file, strerror(errno));
-		return -1;
-	}
-
 	/* offset is page aligned */
 	pa_offset = board->offset & ~(pg - 1);
-	board->parent.map_addr = mmap(NULL, map_size,
-			   PROT_READ | PROT_WRITE,
-			   MAP_SHARED, fd, pa_offset);
-	if (board->parent.map_addr == MAP_FAILED) {
-		fprintf(stderr, "cannot map resource file '%s': %s\n",
-			board->resource_file, strerror(errno));
-		close(fd);
+
+	board->parent.map_addr =
+		pci_map_resource(board->resource_file, pa_offset, map_size);
+	if (board->parent.map_addr == NULL)
 		return -1;
-	}
-	close(fd);
 
 	board->parent.map_length = map_size;
 	board->parent.base =
@@ -637,17 +658,15 @@ struct board_cernvme {
         struct vme_mapping map;
 };
 
-static int cernvme_map(struct board_cernvme *board,
-                       unsigned am, unsigned dw,
-                       unsigned vme_addr, unsigned offset)
+static int cernvme_map_wrpc(struct board_cernvme *board)
 {
         unsigned pg = getpagesize();
 
         memset(&board->map, 0, sizeof(struct vme_mapping));
-        board->map.am = am;
-        board->map.data_width = dw;
+        board->map.am = board->am;
+        board->map.data_width = board->data_width;
         board->map.sizel = map_size;
-        board->map.vme_addrl = vme_addr | (offset & ~(pg - 1));
+        board->map.vme_addrl = board->addr | (board->offset & ~(pg - 1));
 
         board->parent.map_addr = vme_map(&board->map, 1);
         if (!board->parent.map_addr) {
@@ -655,7 +674,7 @@ static int cernvme_map(struct board_cernvme *board,
                 return -1;
         }
         board->parent.map_length = map_size;
-	board->parent.base = board->parent.map_addr + (offset & (pg - 1));
+	board->parent.base = board->parent.map_addr + (board->offset & (pg - 1));
 
         board->parent.is_be = 1;
 
@@ -723,10 +742,11 @@ static int board_cernvme_init_common(struct board *board_base,
 {
 	struct board_cernvme *board = (struct board_cernvme *)board_base;
 	unsigned verbose = 0;
-        unsigned vme_addr = ~0;
-        unsigned data_width = 32;
-        unsigned am = 0x39;
-        unsigned offset = 0;
+
+	board->data_width = 32;
+	board->am = 0x39;
+	board->offset = 0;
+	board->addr = ~0;
 
         while (*argc > 2) {
                 if (argv[1][0] != '-')
@@ -739,7 +759,7 @@ static int board_cernvme_init_common(struct board *board_base,
                 else if (!strcmp(argv[1], "-a") || !strcmp(argv[1], "--address")) {
                         char *e;
                         remove_arg1(argc, argv);
-                        vme_addr = strtoul(argv[1], &e, 0);
+                        board->addr = strtoul(argv[1], &e, 0);
                         if (*e != 0) {
                                 fprintf(stderr, "invalid address '%s'\n", argv[1]);
                                 return -1;
@@ -756,8 +776,8 @@ static int board_cernvme_init_common(struct board *board_base,
                                 fprintf(stderr, "invalid slot '%s'\n", argv[1]);
                                 return -1;
                         }
-			vme_addr = cernvme_slot_to_addr(slot, verbose);
-			if (!vme_addr) {
+			board->addr = cernvme_slot_to_addr(slot, verbose);
+			if (!board->addr) {
 				fprintf(stderr, "cannot find address for slot %u\n", slot);
 				return -1;
 			}
@@ -768,16 +788,16 @@ static int board_cernvme_init_common(struct board *board_base,
                         char *e;
 
                         remove_arg1(argc, argv);
-                        data_width = strtoul(argv[1], &e, 0);
+                        board->data_width = strtoul(argv[1], &e, 0);
                         if (*e != 0) {
                                 fprintf(stderr, "invalid data-width '%s'\n", argv[1]);
                                 return -1;
                         }
-                        if (!(data_width == 8
-                              || data_width == 16
-                              || data_width == 32)) {
+                        if (!(board->data_width == 8
+                              || board->data_width == 16
+                              || board->data_width == 32)) {
                                 fprintf(stderr, "invalid data-width %u\n",
-                                        data_width);
+                                        board->data_width);
                                 return -1;
                         }
                         remove_arg1(argc, argv);
@@ -787,7 +807,7 @@ static int board_cernvme_init_common(struct board *board_base,
                         char *e;
 
                         remove_arg1(argc, argv);
-                        am = strtoul(argv[1], &e, 0);
+                        board->am = strtoul(argv[1], &e, 0);
                         if (*e != 0) {
                                 fprintf(stderr, "invalid address-modifier '%s'\n", argv[1]);
                                 return -1;
@@ -798,7 +818,7 @@ static int board_cernvme_init_common(struct board *board_base,
                          || !strcmp(argv[1], "--offset")) {
                         char *e;
                         remove_arg1(argc, argv);
-                        offset = strtoul(argv[1], &e, 0);
+                        board->offset = strtoul(argv[1], &e, 0);
                         if (*e != 0) {
                                 fprintf (stderr, "bad offset '%s'\n", argv[1]);
                                 return -1;
@@ -812,13 +832,13 @@ static int board_cernvme_init_common(struct board *board_base,
 
         }
 
-        if (vme_addr == ~0) {
+        if (board->addr == ~0) {
                 fprintf (stderr,
                          "vme address (-a) or vme slot (-s) required\n");
                 return -1;
         }
 
-        return cernvme_map (board, am, data_width, vme_addr, offset);
+        return cernvme_map_wrpc (board);
 }
 
 static int board_cernvme_init(struct board *board_base,
@@ -861,7 +881,9 @@ static void board_cernvme_help(void)
 
 static struct board_cernvme board_cernvme =
 {
+	/* board_mem */
 	{
+		/* board */
 		{
 			"vme",
 			board_cernvme_init,
@@ -905,12 +927,224 @@ static struct board_cernvme board_cernvme_le =
 			board_cernvme_fini,
 			board_cernvme_le_help,
 			mem_readl,
-			mem_writel
+			mem_writel,
+			NULL
 		},
 		NULL,
 		0,
 		NULL,
 		0
+	},
+};
+
+static void *wren_vme_map(struct board *base_board, unsigned addr)
+{
+	/* Map the page with windows */
+	struct board_cernvme *board = (struct board_cernvme *)base_board;
+	struct vme_mapping vmap;
+	uint32_t *vme_win;
+	void *res;
+
+        memset(&vmap, 0, sizeof(struct vme_mapping));
+        vmap.am = board->map.am;
+        vmap.data_width = board->map.data_width;
+        vmap.sizel = 4096;
+        vmap.vme_addrl = board->addr | 0x2000;
+
+        vme_win = vme_map(&vmap, 1);
+        if (!vme_win) {
+                fprintf(stderr, "cannot map vme: %s\n", strerror(errno));
+                return NULL;
+        }
+
+	for (unsigned i = 0; i < 8; i++)
+		printf ("wren vme window %u: %08x\n",
+			i, (unsigned)vme_win[(0x200 >> 2) + i]);
+
+	/* Set window */
+	vme_win[(0x200 >> 2) + 6] = addr;
+
+	vme_unmap(&vmap, 0);
+
+	/* Map the window */
+
+        memset(&vmap, 0, sizeof(struct vme_mapping));
+        vmap.am = board->map.am;
+        vmap.data_width = board->map.data_width;
+        vmap.sizel = 4096;
+        vmap.vme_addrl = board->addr | 0x8000 | (0x1000 * 6);
+
+        res = vme_map(&vmap, 1);
+        if (!res) {
+                fprintf(stderr, "cannot map vme: %s\n", strerror(errno));
+                return NULL;
+        }
+
+	return res;
+}
+
+static struct board_cernvme board_wren_vme =
+{
+	/* board_mem */
+	{
+		/* board */
+		{
+			"wren-vme",
+			board_cernvme_le_init,
+			board_cernvme_fini,
+			board_cernvme_le_help,
+			mem_readl,
+			mem_writel,
+			wren_vme_map
+		},
+		NULL,
+		0,
+		NULL,
+		0
+	},
+};
+
+struct board_wren_pcie {
+	struct board_mem parent;
+	struct pci_slot slot;
+
+	/* For map/unmap */
+	void *soc_addr;
+};
+
+static int board_wren_pcie_init(struct board *board_base,
+				int *argc, char *argv[])
+{
+	struct board_wren_pcie *board = (struct board_wren_pcie *)board_base;
+	char pcie_file[64];
+
+	if (*argc > 2 && !strcmp(argv[1], "-s")) {
+		remove_arg1(argc, argv);
+		if (parse_pci_slot(&board->slot, argv[1]) < 0)
+			return -1;
+		remove_arg1(argc, argv);
+	}
+	else {
+		fprintf(stderr, "missing '-s [dom:]bus:slot[.fn][@bar]' for wren-pcie\n");
+		return -1;
+	}
+
+	board->slot.bar = 1;
+
+	snprintf (pcie_file, sizeof(pcie_file),
+		  "/sys/bus/pci/devices/%04x:%02x:%02x.%x/resource%u",
+		  board->slot.domain, board->slot.bus,
+		  board->slot.slot, board->slot.func,
+		  board->slot.bar);
+
+	board->parent.map_addr = pci_map_resource(pcie_file, 0x1000, map_size);
+	if (board->parent.map_addr == NULL)
+		return -1;
+	board->parent.base = board->parent.map_addr;
+	board->parent.is_be = 0; /* default set to little endian */
+
+	return 0;
+}
+
+struct xpcie_ingress {
+  uint32_t capabilities;
+  uint32_t status;
+  uint32_t control;
+  uint32_t pad_0c;
+
+  uint32_t src_base_lo;
+  uint32_t src_base_hi;
+  uint32_t dst_base_lo;
+  uint32_t dst_base_hi;
+};
+
+static void board_wren_pcie_unmap(struct board *base_board)
+{
+	struct board_wren_pcie *board = (struct board_wren_pcie *)base_board;
+
+	if (board->soc_addr) {
+		munmap(board->soc_addr, 0x1000);
+		board->soc_addr = NULL;
+	}
+}
+
+static void *board_wren_pcie_map(struct board *base_board, unsigned addr)
+{
+	char pcie_file[64];
+	struct board_wren_pcie *board = (struct board_wren_pcie *)base_board;
+	void *ingress_base;
+	struct xpcie_ingress *ing;
+
+	board_wren_pcie_unmap(base_board);
+
+	/* Map xpcie bar (bar 0) to change ingress registers */
+	snprintf (pcie_file, sizeof(pcie_file),
+		  "/sys/bus/pci/devices/%04x:%02x:%02x.%x/resource%u",
+		  board->slot.domain, board->slot.bus,
+		  board->slot.slot, board->slot.func, 0);
+
+	ingress_base = pci_map_resource(pcie_file, 0x8000, 0x1000);
+
+	ing = ingress_base + 0x800;
+
+	if (0) {
+		for (unsigned i = 0; i < 8; i++) {
+			printf ("ing %u: %08x %08x -> %08x %08x, ctrl: %08x (size: %uKB)\n", i,
+				ing[i].src_base_hi, ing[i].src_base_lo,
+				ing[i].dst_base_hi, ing[i].dst_base_lo,
+				ing[i].control,
+				(4 << ((ing[i].control >> 16) & 0x1f)));
+		}
+	}
+
+	/* Modify ingress #3 used by bar 2 (was OCM) */
+	ing[3].control = 0;
+	ing[3].dst_base_hi = 0;
+	ing[3].dst_base_lo = addr;
+	ing[3].control = 1;
+
+	munmap(ingress_base, 0x1000);
+
+	/* And now map bar2 */
+	snprintf (pcie_file, sizeof(pcie_file),
+		  "/sys/bus/pci/devices/%04x:%02x:%02x.%x/resource%u",
+		  board->slot.domain, board->slot.bus,
+		  board->slot.slot, board->slot.func, 2);
+
+	board->soc_addr = pci_map_resource(pcie_file, 0, 0x1000);
+	return board->soc_addr;
+}
+
+static int board_wren_pcie_fini(struct board *base_board)
+{
+	struct board_wren_pcie *board = (struct board_wren_pcie *)base_board;
+	munmap(board->parent.map_addr, board->parent.map_length);
+
+	return 0;
+}
+
+static void board_wren_pcie_help(void)
+{
+        printf("WREN-pcie board\n");
+        printf(" -s [domain:]bus:slot[.func]\n");
+}
+
+static struct board_cernvme board_wren_pcie =
+{
+	/* board_mem */
+	{
+		/* board */
+		{
+			"wren-pcie",
+			board_wren_pcie_init,
+			board_wren_pcie_fini,
+			board_wren_pcie_help,
+			mem_readl,
+			mem_writel,
+			board_wren_pcie_map,
+			board_wren_pcie_unmap
+		},
+		NULL, 0, NULL, 0
 	},
 };
 
@@ -964,7 +1198,12 @@ static int board_wr2rf_init(struct board *board_base,
                 return -1;
         }
 
-        return cernvme_map(board, 0x39, 16, vme_addr, 0x2000);
+	board->am = 0x39;
+	board->data_width = 16;
+	board->addr = vme_addr;
+	board->offset = 0x2000;
+
+        return cernvme_map_wrpc(board);
 }
 
 static void board_wr2rf_help(void)
@@ -1002,8 +1241,10 @@ static struct board *boards[] = {
 #ifdef SUPPORT_CERN_VMEBRIDGE
 	&board_cernvme.parent.parent,
 	&board_cernvme_le.parent.parent,
+	&board_wren_vme.parent.parent,
 	&board_wr2rf.parent.parent,
 #endif
+	&board_wren_pcie.parent.parent,
 #ifdef SUPPORT_WRS
         &board_wrs.parent.parent,
 #endif
@@ -1482,7 +1723,7 @@ static int do_help(int argc, char *argv[])
 			if (tool->help == NULL)
 				printf("%s\n", tool->short_help);
 			else
-				tool->help();
+				tool->help(tool->name);
 		}
 	}
 	return 0;
@@ -1494,7 +1735,7 @@ static int do_version(int argc, char *argv[])
 	return 0;
 }
 
-static void help_load(void)
+static void help_load(const char *cmd)
 {
         printf("usage: %s load [-c CORE] BOARD-OPTIONS FILENAME\n", progname);
         printf("Load FILENAME into WR cpu and restart the code\n");
@@ -1565,7 +1806,7 @@ static int do_load(int argc, char *argv[])
 
 	if (((cmd == CMD_LOAD || cmd == CMD_SAVE) && (optind != argc - 1))
 	    || (cmd == CMD_DUMP && optind != argc)) {
-		help_load();
+		help_load(NULL);
 		return 2;
 	}
 	filename = argv[optind];
@@ -1609,7 +1850,7 @@ static int do_load(int argc, char *argv[])
 	return status;
 }
 
-static void help_vuart(void)
+static void help_vuart(const char *cmd)
 {
 	fprintf(stderr, "usage: %s vuart BOARD-OPTIONS [-k] [-c <cmd>] [-r] [-t <timeout>]\n", progname);
 	fprintf(stderr, " -k keep terminal\n");
@@ -1996,7 +2237,7 @@ static int do_vuart(int argc, char *argv[])
 
 #ifndef SUPPORT_WRS
 
-static void help_info(void)
+static void help_info(const char *cmd)
 {
 	printf("usage: %s info\n", progname);
 	printf("display board info\n"
@@ -2032,7 +2273,7 @@ static int do_info(int argc, char *argv[])
 	return 0;
 }
 
-static void help_mac(void)
+static void help_mac(const char *cmd)
 {
 	printf("usage: %s mac\n", progname);
 	printf("display mac address\n");
@@ -2079,7 +2320,7 @@ static int do_board(int argc, char *argv[])
         return 0;
 }
 
-static void help_spll_recorder(void)
+static void help_spll_recorder(const char *cmd)
 {
 	fprintf(stderr, "SoftPLL debug/recorder tool. \n");
 	fprintf(stderr, "This dumps the real-time SPLL traces (error values/DAC drive/events) into stdout for the purpose of further analysis/plotting. \n");
@@ -2365,7 +2606,7 @@ static int do_spll_recorder(int argc, char *argv[])
 			undersample = atoi(optarg);
 			break;
 		case 'h':
-			help_spll_recorder();
+			help_spll_recorder(NULL);
 			break;
 		case 'd':
 			debug = 1;
@@ -2401,7 +2642,7 @@ static int do_spll_recorder(int argc, char *argv[])
 	return 0;
 }
 
-static void help_spll_display(void)
+static void help_spll_display(const char *cmd)
 {
 	fprintf(stderr, "SoftPLL log display.\n");
 	fprintf(stderr, "This reads binary dumps from spll-recorder -b\n");
@@ -3755,10 +3996,10 @@ out_sock:
         return ret_exit;
 }
 
-static void help_gdbserver(void)
+static void help_gdbserver(const char *cmd)
 {
-	fprintf(stderr, "usage: %s gdbserver BOARD-OPTIONS [options]\n",
-		progname);
+	fprintf(stderr, "usage: %s %s BOARD-OPTIONS [options]\n",
+		progname, cmd);
 	fprintf(stderr, " -p PORT       listen on tcp port PORT\n");
 	fprintf(stderr, " -v            verbose\n");
 	fprintf(stderr, " -t            enable terminal\n");
@@ -3792,7 +4033,7 @@ static int do_gdbserver(int argc, char *argv[])
 
 #ifndef SUPPORT_WRS
 
-static void help_wdiags(void)
+static void help_wdiags(const char *cmd)
 {
 	printf("usage: %s wdiags\n", progname);
 	printf("display diagnostic registers\n");
@@ -4053,7 +4294,7 @@ static int do_wdiags(int argc, char *argv[])
 	return 0;
 }
 
-static void help_aux_logger(void)
+static void help_aux_logger(const char *cmd)
 {
 	printf("usage: %s aux-logger\n", progname);
 }
@@ -4452,29 +4693,52 @@ struct bit_xlat_t {
 	unsigned bit;
 };
 
+#define DSCR_RXfull (1 << 30)
+#define DSCR_TXfull (1 << 29)
+#define DSCR_PipeAdv (1 << 25)
+#define DSCR_InstrCompl (1 << 24)
+#define DSCR_ExtDCCmode1 (1 << 21)
+#define DSCR_ExtDCCmode0 (1 << 20)
+#define DSCR_ADAdiscard (1 << 19)
+#define DSCR_MDBgen (1 << 15)
+#define DSCR_HDBGen (1 << 14)
+#define DSCR_ITRen (1 << 13)
+#define DSCR_UDCCdis (1 << 12)
+#define DSCR_INTdis (1 << 11)
+#define DSCR_DBGack (1 << 10)
+#define DSCR_UND_I (1 << 8)
+#define DSCR_ADABORT_I (1 << 7)
+#define DSCR_SDABORT_I (1 << 6)
+#define DSCR_MOE3 (1 << 5)
+#define DSCR_MOE2 (1 << 4)
+#define DSCR_MOE1 (1 << 3)
+#define DSCR_MOE0 (1 << 2)
+#define DSCR_RESTARTED (1 << 1)
+#define DSCR_HALTED (1 << 0)
+
 static const struct bit_xlat_t dscr_xlat[] = {
-	{ "RXfull", 1 << 30 },
-	{ "TXfull", 1 << 29 },
-	{ "PipeAdv", 1 << 25 },
-	{ "InstrCompl", 1 << 24 },
-	{ "ExtDCCmode1", 1 << 21 },
-	{ "ExtDCCmode0", 1 << 20 },
-	{ "ADAdiscard", 1 << 19 },
-	{ "MDBgen", 1 << 15 },
-	{ "HDBGen", 1 << 14 },
-	{ "ITRen", 1 << 13 },
-	{ "UDCCdis", 1 << 12 },
-	{ "INTdis", 1 << 11 },
-	{ "DBGack", 1 << 10 },
-	{ "UND_I", 1 << 8 },
-	{ "ADABORT_I", 1 << 7 },
-	{ "SDABORT_I", 1 << 6 },
-	{ "MOE3", 1 << 5 },
-	{ "MOE2", 1 << 4 },
-	{ "MOE1", 1 << 3 },
-	{ "MOE0", 1 << 2 },
-	{ "RESTARTED", 1 << 1 },
-	{ "HALTED", 1 << 0 },
+	{ "RXfull", DSCR_RXfull },
+	{ "TXfull", DSCR_TXfull },
+	{ "PipeAdv", DSCR_PipeAdv },
+	{ "InstrCompl", DSCR_InstrCompl },
+	{ "ExtDCCmode1", DSCR_ExtDCCmode1 },
+	{ "ExtDCCmode0", DSCR_ExtDCCmode0 },
+	{ "ADAdiscard", DSCR_ADAdiscard },
+	{ "MDBgen", DSCR_MDBgen },
+	{ "HDBGen", DSCR_HDBGen },
+	{ "ITRen", DSCR_ITRen },
+	{ "UDCCdis", DSCR_UDCCdis },
+	{ "INTdis", DSCR_INTdis },
+	{ "DBGack", DSCR_DBGack },
+	{ "UND_I", DSCR_UND_I },
+	{ "ADABORT_I", DSCR_ADABORT_I },
+	{ "SDABORT_I", DSCR_SDABORT_I },
+	{ "MOE3", DSCR_MOE3 },
+	{ "MOE2", DSCR_MOE2 },
+	{ "MOE1", DSCR_MOE1 },
+	{ "MOE0", DSCR_MOE0 },
+	{ "RESTARTED", DSCR_RESTARTED },
+	{ "HALTED", DSCR_HALTED },
 	{ NULL, 0 }
 };
 
@@ -4483,6 +4747,16 @@ static void disp_bits(const struct bit_xlat_t *xlat, uint32_t v)
 	for (; xlat->name; xlat++)
 		if (v & xlat->bit)
 			printf(" %s", xlat->name);
+}
+
+static void dbg_r5_write_dbgreg(void *regs, unsigned off, unsigned val)
+{
+	*(volatile unsigned *)(regs + off) = val;
+}
+
+static unsigned dbg_r5_read_dbgreg(void *regs, unsigned off)
+{
+	return *(volatile unsigned *)(regs + off);
 }
 
 static unsigned dbg_r5_read_dscr(void *regs)
@@ -4520,7 +4794,7 @@ static void dbg_r5_enable_itr(void *regs)
 	unsigned dscr = dbg_r5_read_dscr(regs);
 
 	/* ITRen */
-	dbg_r5_write_dscr(regs, dscr | (1 << 13));
+	dbg_r5_write_dscr(regs, dscr | DSCR_ITRen);
 }
 
 static void dbg_r5_halt_restart(void *regs, unsigned val)
@@ -4546,11 +4820,23 @@ static void dbg_r5_reset(void *regs)
 	*(volatile unsigned *)(regs + R5_DBG_PRCR) |= 2;
 }
 
-static unsigned dbg_r5_read_dcc(void *regs)
+static int dbg_r5_wait_dcc_tx(void *regs)
 {
 	/* Wait until TXfull is set */
-	while (!(dbg_r5_read_dscr(regs) & (1 << 29)))
+	for (unsigned timeout = 10; timeout > 0; timeout--) {
+		if (dbg_r5_read_dscr(regs) & DSCR_TXfull)
+			return 0;
 		usleep(1);
+	}
+	return -1;
+}
+
+static unsigned dbg_r5_read_dcc(void *regs)
+{
+	if (dbg_r5_wait_dcc_tx(regs) < 0) {
+		printf("cannot read dcc\n");
+		return 0;
+	}
 
 	return *(volatile unsigned *)(regs + R5_DBG_DTRTXext);
 }
@@ -4558,7 +4844,7 @@ static unsigned dbg_r5_read_dcc(void *regs)
 static void dbg_r5_write_dcc(void *regs, uint32_t val)
 {
 	/* Wait until RXfull is empty */
-	while (dbg_r5_read_dscr(regs) & (1 << 30))
+	while (dbg_r5_read_dscr(regs) & DSCR_RXfull)
 		usleep(1);
 
 	*(volatile unsigned *)(regs + R5_DBG_DTRRXext) = val;
@@ -4663,35 +4949,44 @@ static void dbg_r5_write_reg(void *regs, unsigned rd, uint32_t val)
 	dbg_r5_exec_dcc_to_reg(regs, rd);
 }
 
-static void dbg_r5_halt(void *regs)
+static int dbg_r5_halt(void *regs)
 {
+	unsigned timeout;
+
 	unsigned dscr = dbg_r5_read_dscr(regs);
 	if (!(dscr & 1)) {
 		/* Not in debug state */
 
-		if (!(dscr & (1 << 14))) {
+		if (!(dscr & DSCR_HDBGen)) {
 			/* Enable halting debug-mode */
-			dbg_r5_write_dscr(regs, dscr | (1 << 14));
+			dbg_r5_write_dscr(regs, dscr | DSCR_HDBGen);
 		}
 
 		/* Request to halt */
 		dbg_r5_write_drcr(regs, 1);
 
-		while (1) {
+		for (timeout = 10; timeout > 0; timeout--) {
 			dscr = dbg_r5_read_dscr(regs);
 			if (dscr & 1)
 				break;
 			usleep(1);
 		}
+		if (timeout == 0) {
+			printf("cannot halt target!\n");
+			return -1;
+		}
 	}
 
-	if (dscr & (1 << 29)) {
+	if (!(dscr & DSCR_ITRen))
+		dbg_r5_write_dscr(regs, dscr | DSCR_ITRen);
+
+	if (dscr & DSCR_TXfull) {
 		printf ("TXfull was set!\n");
 
-		*(volatile unsigned *)(regs + R5_DBG_DTRTXext);
+		dbg_r5_read_dbgreg (regs, R5_DBG_DTRTXext);
 	}
 
-	if (dscr & (1 << 30)) {
+	if (dscr & DSCR_RXfull) {
 		unsigned r0;
 		printf ("RXfull was set!\n");
 
@@ -4699,6 +4994,8 @@ static void dbg_r5_halt(void *regs)
 		dbg_r5_exec_dcc_to_reg(regs, 0);
 		dbg_r5_write_reg (regs, 0, r0);
 	}
+
+	return 0;
 }
 
 static void dbg_r5_dump(void *regs)
@@ -4716,7 +5013,7 @@ static void dbg_r5_dump(void *regs)
 
 	dbg_r5_enable_itr(regs);
 
-	if (dscr & 1) {
+	if (verbose > 2 && (dscr & 1)) {
 		for (unsigned i = 0; i < 15; i++)
 			printf("R%02u: %08x\n", i, dbg_r5_read_reg(regs, i));
 	}
@@ -4767,12 +5064,6 @@ static void zynqmp_dbg_reset(int fd, unsigned dbg_base)
 	if (regs == NULL)
 		return;
 	dbg_r5_reset(regs);
-}
-
-static int gdb_r5_halt(struct dbg_port *dbg)
-{
-	dbg_r5_halt(dbg->dap);
-	return 0;
 }
 
 /**
@@ -4866,10 +5157,25 @@ static int gdb_r5_handle_m(struct dbg_port *dbg,
 	out->size = 0;
 	for (; n > 0; --n) {
 		uint8_t b;
+		unsigned dscr;
 
 		/* ldrb r1,[r0],1 */
 		dbg_r5_exec_insn(dbg->dap, 0xe4d01001);
 
+		dscr = dbg_r5_read_dscr(dbg->dap);
+		if (dscr & (DSCR_SDABORT_I | DSCR_ADABORT_I)) {
+			if (verbose) {
+				printf ("read failed, dscr: %08x", dscr);
+				disp_bits(dscr_xlat, dscr);
+				printf ("\n");
+			}
+
+			/* Clear the bit */
+			dbg_r5_write_drcr(dbg->dap, 4);
+
+			gdb_packet_put_str(out, "E01");
+			break;
+		}
 		b = dbg_r5_read_reg(dbg->dap, 1);
 		gdb_packet_append_x8(out, b);
 	}
@@ -5116,9 +5422,43 @@ static gdb_command_t * const gdb_r5_commands[] = {
 	['?'] = gdb_handle_qm,
 };
 
-static void help_zynqmp_rpu(void)
+static int gdb_r5_halt(struct dbg_port *dbg)
 {
-	printf("usage: %s zynqmp-rpu\n", progname);
+	if (dbg_r5_halt(dbg->dap) < 0)
+		return -1;
+
+	/* Catch undefined, svc, prefetch, data */
+	dbg_r5_write_vcr(dbg->dap, 0x1e);
+
+	return 0;
+}
+
+static void gdb_r5_server(struct dbg_port *dbg, int argc, char **argv)
+{
+	dbg_r5_unlock_access(dbg->dap);
+
+	/* For write-through */
+	dbg_r5_write_dsccr(dbg->dap, 0);
+
+	dbg_r5_dump(dbg->dap);
+
+	/* Check writes */
+	dbg_r5_write_dbgreg (dbg->dap, R5_DBG_WFAR, 0x005c3a7e);
+	if (dbg_r5_read_dbgreg (dbg->dap, R5_DBG_WFAR) != 0x005c3a7e) {
+		printf("cannot write debug registers, unauthorized ?\n");
+		return;
+	}
+
+	dbg->cmds = gdb_r5_commands;
+	dbg->n_cmds = sizeof(gdb_r5_commands) / sizeof(gdb_r5_commands[0]);
+	dbg->post_connect_hook = gdb_r5_halt;
+
+	gdb_server(dbg, argc, argv);
+}
+
+static void help_zynqmp_rpu(const char *name)
+{
+	printf("usage: %s zynqmp-rpu SUBCMD\n", progname);
 }
 
 static int do_zynqmp_rpu(int argc, char *argv[])
@@ -5255,21 +5595,7 @@ static int do_zynqmp_rpu(int argc, char *argv[])
 			if (dbg.dap == NULL)
 				return -1;
 
-			dbg_r5_unlock_access(dbg.dap);
-			dbg_r5_enable_itr(dbg.dap);
-
-			/* Catch undefined, svc, prefetch, data */
-			dbg_r5_write_vcr(dbg.dap, 0x1e);
-
-			/* For write-through */
-			dbg_r5_write_dsccr(dbg.dap, 0);
-
-			dbg.cmds = gdb_r5_commands;
-			dbg.n_cmds = sizeof(gdb_r5_commands)
-				/ sizeof(gdb_r5_commands[0]);
-			dbg.post_connect_hook = gdb_r5_halt;
-
-			gdb_server(&dbg, argc - i, argv + i);
+			gdb_r5_server(&dbg, argc - i, argv + i);
 			i = argc;
 		}
 		else
@@ -5280,6 +5606,296 @@ static int do_zynqmp_rpu(int argc, char *argv[])
 }
 
 #endif /* !defined(SUPPORT_WRS) */
+
+static int dbg_init_rpu(struct dbg_port *dbg, unsigned r5_addr, int *argc, char *argv[])
+{
+        /* Decode board options and open the board. */
+        if (board_open(argc, argv) < 0)
+		return -1;
+
+	if (board->map == NULL) {
+		fprintf(stderr, "gdbserver-rpu not support on board %s\n",
+			board->name);
+		return -1;
+	}
+	dbg->dap = board->map(board, r5_addr);
+	if (dbg->dap == NULL)
+		return -1;
+
+	return 0;
+}
+
+static int do_gdbserver_rpu(unsigned r5_addr, int argc, char *argv[])
+{
+	struct dbg_port dbg;
+
+	if (dbg_init_rpu(&dbg, r5_addr, &argc, argv) < 0)
+		return -1;
+
+	gdb_r5_server(&dbg, argc, argv);
+
+        board->fini(board);
+        return 0;
+}
+
+static int do_gdbserver_rpu0(int argc, char *argv[])
+{
+	return do_gdbserver_rpu(R5_DBG_0_BASEADDR, argc, argv);
+}
+
+static int do_gdbserver_rpu1(int argc, char *argv[])
+{
+	return do_gdbserver_rpu(R5_DBG_1_BASEADDR, argc, argv);
+}
+
+static int do_check_dbg_rpu(unsigned cpu_idx, int argc, char *argv[])
+{
+	struct dbg_port dbg;
+	void *regs;
+	unsigned dscr;
+	unsigned timeout;
+	unsigned lsr;
+	unsigned prsr;
+	unsigned r5_addr = R5_DBG_0_BASEADDR | (cpu_idx << 13);
+	unsigned rst_lpd;
+	unsigned val;
+
+	/* Map CRL */
+	if (dbg_init_rpu(&dbg, RPU_BASEADDR, &argc, argv) < 0)
+		return -1;
+	regs = dbg.dap;
+
+	val = *(volatile unsigned *)(regs + RPU_RPU_GLBL_CNTL);
+	printf ("RPU glbl_cntl:    0x%08x\n", val);
+	val = *(volatile unsigned *)(regs + RPU_RPU_0_CFG);
+	printf ("RPU rpu0_cfg:     0x%08x\n", val);
+	val = *(volatile unsigned *)(regs + RPU_RPU_0_STATUS);
+	printf ("RPU rpu0_status:  0x%08x\n", val);
+	val = *(volatile unsigned *)(regs + RPU_RPU_1_CFG);
+	printf ("RPU rpu1_cfg:     0x%08x\n", val);
+	val = *(volatile unsigned *)(regs + RPU_RPU_1_STATUS);
+	printf ("RPU rpu1_status:  0x%08x\n", val);
+
+	{
+		unsigned off = cpu_idx == 1 ? RPU_RPU_1_CFG : RPU_RPU_0_CFG;
+		val = *(volatile unsigned *)(regs + off);
+		if (!(val & 1)) {
+			printf ("set /CPUHALT\n");
+			*(volatile unsigned *)(regs + off) = 1;
+		}
+	}
+
+	regs = board->map(board, CRL_APB_BASEADDR);
+	if (regs == NULL)
+		return -1;
+
+	rst_lpd = *(volatile unsigned *)(regs + CRL_APB_RST_LPD_TOP);
+	printf ("RST_LPD_TOP: %08x\n", rst_lpd);
+	if (rst_lpd & (1 << cpu_idx)) {
+	    printf ("CPU under reset\n");
+	    rst_lpd &= ~(1 << cpu_idx);
+	    *(volatile unsigned *)(regs + CRL_APB_RST_LPD_TOP) = rst_lpd;
+	}
+
+	val = *(volatile unsigned *)(regs + CRL_APB_CPU_R5_CTRL);
+	printf ("CRL_APB cpu_r5_ctrl:  0x%08x\n", val);
+	val = *(volatile unsigned *)(regs + CRL_APB_RST_LPD_TOP);
+	printf ("CRL_APB rst_lpd_top:  0x%08x\n", val);
+
+	regs = board->map(board, r5_addr);
+	if (regs == NULL)
+		return -1;
+
+	dbg.dap = regs;
+
+	prsr = dbg_r5_read_dbgreg(regs, R5_DBG_PRSR);
+	if (!(prsr & 1)) {
+		printf ("CPU is powered-down (prsr: %02x)\n", prsr);
+		return -1;
+	}
+	if (prsr & 4) {
+		printf ("CPU is held in reset (prsr: %02x)\n", prsr);
+		return -1;
+	}
+
+	dbg_r5_dump(regs);
+
+	lsr = dbg_r5_read_dbgreg(regs, R5_DBG_LSR);
+	if (lsr & 2) {
+		printf ("unlock write access\n");
+		dbg_r5_unlock_access(regs);
+	}
+
+	dscr = dbg_r5_read_dscr(regs);
+
+	if (!(dscr & DSCR_HDBGen)) {
+		printf ("Enable halting debug-mode\n");
+		dbg_r5_write_dscr(regs, dscr | DSCR_HDBGen);
+		dscr = dbg_r5_read_dscr(regs);
+		if (!(dscr & DSCR_HDBGen)) {
+			printf ("failed to set HDBGen\n");
+			return -1;
+		}
+	}
+	else
+		printf ("Halting debug-mode already enabled\n");
+
+
+	if (dscr & DSCR_HALTED)
+		printf ("Target is already halted!\n");
+	else {
+		printf ("Request to halt...");
+		fflush(stdout);
+
+		/* Request to halt */
+		dbg_r5_write_drcr(regs, 1);
+
+		for (timeout = 10; timeout > 0; timeout--) {
+			dscr = dbg_r5_read_dscr(regs);
+			if (dscr & 1)
+				break;
+			usleep(1);
+		}
+		if (timeout == 0) {
+			printf("cannot halt target!\n");
+			return -1;
+		}
+		printf ("target halted\n");
+	}
+
+	if (!(dscr & DSCR_InstrCompl)) {
+		printf ("DSCR.InstrCompl not set: "
+			"cpu is executing an ITR instruction\n");
+		return -1;
+	}
+
+	if (dscr & DSCR_PipeAdv) {
+		printf ("Clear PipeAdv\n");
+		dbg_r5_write_drcr(regs, 8);
+		dscr = dbg_r5_read_dscr(regs);
+		if (dscr & DSCR_PipeAdv) {
+			printf ("failed to clear PipeAdv\n");
+			return -1;
+		}
+	}
+
+	if (dscr & (DSCR_SDABORT_I | DSCR_ADABORT_I | DSCR_UND_I)) {
+		printf("clear sticky exception bit\n");
+		dbg_r5_write_drcr(regs, 4);
+		dscr = dbg_r5_read_dscr(regs);
+		if (dscr & (DSCR_SDABORT_I | DSCR_ADABORT_I | DSCR_UND_I)) {
+			printf ("failed to clear sticky exception bit\n");
+			return -1;
+		}
+	}
+
+	if (dscr & DSCR_ITRen)
+		printf ("ITRen is already set!\n");
+	else {
+		dbg_r5_write_dscr(regs, dscr | DSCR_ITRen);
+		dscr = dbg_r5_read_dscr(regs);
+		if (!(dscr & DSCR_ITRen)) {
+			printf ("failed to set ITRen\n");
+			return -1;
+		}
+	}
+
+	printf ("Try to execute an instruction... ");
+	fflush(stdout);
+	dbg_r5_write_dbgreg(regs, R5_DBG_ITR, 0xe320f000); // nop
+	for (timeout = 10; timeout > 0; timeout--) {
+		dscr = dbg_r5_read_dscr(regs);
+		if (dscr & DSCR_InstrCompl)
+			break;
+		usleep(1);
+	}
+	if (timeout == 0) {
+		printf ("failed (timeout)\n");
+		return -1;
+	}
+	if (!(dscr & DSCR_PipeAdv)) {
+		printf ("PipeAdv is not set after instruction execution\n");
+		return -1;
+	}
+	printf ("OK!\n");
+
+	if (dscr & DSCR_TXfull) {
+		printf ("TXfull is set\n");
+		dbg_r5_read_dbgreg(regs, R5_DBG_DTRTXext);
+		dscr = dbg_r5_read_dscr(regs);
+		if (dscr & DSCR_TXfull) {
+			printf ("Failed to clear TXfull\n");
+			return -1;
+		}
+	}
+	if (dscr & DSCR_RXfull) {
+		unsigned r0;
+
+		printf ("RXfull is set\n");
+		r0 = dbg_r5_read_reg(regs, 0);
+		dbg_r5_exec_dcc_to_reg(regs, 0);
+		dscr = dbg_r5_read_dscr(regs);
+		if (dscr & DSCR_RXfull) {
+			printf("cannot cleat RXfull\n");
+			return -1;
+		}
+		dbg_r5_write_reg(regs, 0, r0);
+	}
+
+        board->fini(board);
+        return 0;
+}
+
+static void help_check_dbg(const char *cmd)
+{
+	fprintf(stderr, "usage: %s %s BOARD-OPTIONS [options]\n",
+		progname, cmd);
+}
+
+static int do_check_dbg_rpu0(int argc, char *argv[])
+{
+	return do_check_dbg_rpu(0, argc, argv);
+}
+
+static int do_check_dbg_rpu1(int argc, char *argv[])
+{
+	return do_check_dbg_rpu(1, argc, argv);
+}
+
+static int do_rd(int argc, char *argv[])
+{
+	unsigned pg = getpagesize();
+	unsigned *ptr;
+	unsigned addr = 0xff040000;
+
+        /* Decode board options and open the board. */
+        if (board_open(&argc, argv) < 0)
+		return -1;
+
+	if (argc > 2 && !strcmp(argv[1], "-a")) {
+		addr = strtoul(argv[2], NULL, 0);
+	}
+
+	if (board->map == NULL) {
+		fprintf(stderr, "gdbserver-rpu not support on board %s\n",
+			board->name);
+		return -1;
+	}
+	ptr = board->map(board, addr & ~(pg - 1));
+	if (ptr == NULL)
+		return -1;
+
+	ptr += (addr & (pg - 1)) >> 2;
+	printf("[%08x] = %08x\n", addr, *ptr);
+
+        board->fini(board);
+        return 0;
+}
+
+static void help_rd(const char *cmd)
+{
+        printf("usage: %s rd BOARD-OPTIONS\n", progname);
+}
 
 static const struct tool_base tool_help = {
         "help",
@@ -5348,9 +5964,44 @@ static const struct tool_base tool_spll_display = {
 
 static const struct tool_base tool_gdbserver = {
         "gdbserver",
-        "risc-v gdb-sever",
+        "risc-v gdb-server",
         do_gdbserver,
         help_gdbserver
+};
+
+static const struct tool_base tool_gdbserver_rpu0 = {
+        "gdbserver-rpu0",
+        "cortex-r5 gdb-server for ZynqUS+ RPU0",
+        do_gdbserver_rpu0,
+        help_gdbserver
+};
+
+static const struct tool_base tool_gdbserver_rpu1 = {
+        "gdbserver-rpu1",
+        "cortex-r5 gdb-server for ZynqUS+ RPU1",
+        do_gdbserver_rpu1,
+        help_gdbserver
+};
+
+static const struct tool_base tool_check_dbg_rpu0 = {
+        "checkdbg-rpu0",
+        "Check debug port of cortex-r5 ZynqUS+ RPU0",
+        do_check_dbg_rpu0,
+        help_check_dbg
+};
+
+static const struct tool_base tool_check_dbg_rpu1 = {
+        "checkdbg-rpu1",
+        "Check debug port of cortex-r5 ZynqUS+ RPU1",
+        do_check_dbg_rpu1,
+        help_check_dbg
+};
+
+static const struct tool_base tool_rd = {
+        "rd",
+        "Read a word on the local bus",
+        do_rd,
+        help_rd
 };
 
 
@@ -5391,6 +6042,11 @@ static const struct tool_base *tools[] = {
 	&tool_spll_recorder,
 	&tool_spll_display,
 	&tool_gdbserver,
+	&tool_gdbserver_rpu0,
+	&tool_gdbserver_rpu1,
+	&tool_rd,
+	&tool_check_dbg_rpu0,
+	&tool_check_dbg_rpu1,
 #ifndef SUPPORT_WRS
 	&tool_wdiags,
         &tool_aux_logger,
@@ -5440,7 +6096,7 @@ int main(int argc, char *argv[])
 	if (argc > 1)
 		if (strcmp (argv[1], "-h") == 0
 		    || strcmp (argv[1], "--help") == 0) {
-			tool->help();
+			tool->help(tool->name);
 			return 0;
 		}
 
