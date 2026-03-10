@@ -4783,6 +4783,74 @@ static const struct bit_xlat_t dscr_xlat[] = {
 	{ NULL, 0 }
 };
 
+#define SCTLR_M (1 << 0)
+#define SCTLR_A (1 << 1)
+#define SCTLR_C (1 << 2)
+#define SCTLR_SW (1 << 10)
+#define SCTLR_Z (1 << 11)
+#define SCTLR_I (1 << 12)
+#define SCTLR_V (1 << 13)
+#define SCTLR_RR (1 << 14)
+#define SCTLR_BR (1 << 17)
+#define SCTLR_DZ (1 << 19)
+#define SCTLR_FI (1 << 21)
+#define SCTLR_VE (1 << 24)
+#define SCTLR_EE (1 << 25)
+#define SCTLR_NMFI (1 << 27)
+#define SCTLR_TRE (1 << 28)
+#define SCTLR_AFE (1 << 29)
+#define SCTLR_TE (1 << 30)
+#define SCTLR_IE (1 << 31)
+
+static const struct bit_xlat_t sctlr_xlat[] = {
+	{ "M", SCTLR_M },
+	{ "A", SCTLR_A },
+	{ "C", SCTLR_C },
+	{ "SW", SCTLR_SW },
+	{ "Z", SCTLR_Z },
+	{ "I", SCTLR_I },
+	{ "V", SCTLR_V },
+	{ "RR", SCTLR_RR },
+	{ "BR", SCTLR_BR },
+	{ "DZ", SCTLR_DZ },
+	{ "FI", SCTLR_FI },
+	{ "VE", SCTLR_VE },
+	{ "EE", SCTLR_EE },
+	{ "NMFI", SCTLR_NMFI },
+	{ "TRE", SCTLR_TRE },
+	{ "AFE", SCTLR_AFE },
+	{ "TE", SCTLR_TE },
+	{ "IE", SCTLR_IE },
+	{ NULL, 0 }
+};
+
+#define CPSR_T  (1 << 5)
+#define CPSR_F  (1 << 6)
+#define CPSR_I  (1 << 7)
+#define CPSR_A  (1 << 8)
+#define CPSR_E  (1 << 9)
+#define CPSR_J  (1 << 24)
+#define CPSR_Q  (1 << 27)
+#define CPSR_V  (1 << 28)
+#define CPSR_C  (1 << 29)
+#define CPSR_Z  (1 << 30)
+#define CPSR_N  (1 << 31)
+
+static const struct bit_xlat_t cpsr_xlat[] = {
+	{ "T", CPSR_T },
+	{ "F", CPSR_F },
+	{ "I", CPSR_I },
+	{ "A", CPSR_A },
+	{ "E", CPSR_E },
+	{ "J", CPSR_J },
+	{ "Q", CPSR_Q },
+	{ "V", CPSR_V },
+	{ "C", CPSR_C },
+	{ "Z", CPSR_Z },
+	{ "N", CPSR_N },
+	{ NULL, 0 }
+};
+
 static void disp_bits(const struct bit_xlat_t *xlat, uint32_t v)
 {
 	for (; xlat->name; xlat++)
@@ -4917,6 +4985,30 @@ static void dbg_r5_exec_insn(void *regs, unsigned insn)
 		usleep(1);
 }
 
+static void dbg_r5_exec_mrc(void *regs, unsigned coproc, unsigned opc1,
+			    unsigned crn, unsigned crm, unsigned opc2)
+{
+	unsigned insn;
+
+	insn = (0xe << 28) | (0xe << 24) | (opc1 << 21) | (1 << 20)
+		| (crn << 16) | (0 << 12) | (coproc << 8) | (opc2 << 5)
+		| (1 << 4) | (crm << 0);
+
+	dbg_r5_exec_insn(regs, insn);
+}
+
+static void dbg_r5_exec_mcr(void *regs, unsigned coproc, unsigned opc1,
+			    unsigned crn, unsigned crm, unsigned opc2)
+{
+	unsigned insn;
+
+	insn = (0xe << 28) | (0xe << 24) | (opc1 << 21) | (0 << 20)
+		| (crn << 16) | (0 << 12) | (coproc << 8) | (opc2 << 5)
+		| (1 << 4) | (crm << 0);
+
+	dbg_r5_exec_insn(regs, insn);
+}
+
 static void dbg_r5_exec_dcc_to_reg(void *regs, unsigned rd)
 {
 	/* MRC p14, 0, rd, c0, c5, 0 */
@@ -4988,6 +5080,23 @@ static void dbg_r5_write_reg(void *regs, unsigned rd, uint32_t val)
 	dbg_r5_write_dcc(regs, val);
 
 	dbg_r5_exec_dcc_to_reg(regs, rd);
+}
+
+static unsigned dbg_r5_read_cp_via_r0(void *regs,
+				      unsigned coproc, unsigned opc1,
+				      unsigned crn, unsigned crm, unsigned opc2)
+{
+	dbg_r5_exec_mrc(regs, coproc, opc1, crn, crm, opc2);
+	return dbg_r5_read_reg(regs, 0);
+}
+
+static void dbg_r5_write_cp_via_r0(void *regs,
+				   unsigned coproc, unsigned opc1,
+				   unsigned crn, unsigned crm, unsigned opc2,
+				   unsigned val)
+{
+	dbg_r5_write_reg(regs, 0, val);
+	dbg_r5_exec_mcr(regs, coproc, opc1, crn, crm, opc2);
 }
 
 static int dbg_r5_halt(void *regs)
@@ -5107,6 +5216,46 @@ static void zynqmp_dbg_reset(int fd, unsigned dbg_base)
 	dbg_r5_reset(regs);
 }
 
+static int gdb_check_mem_fault(struct dbg_port *dbg, unsigned addr)
+{
+	unsigned dscr;
+	void *regs = dbg->dap;
+
+	dscr = dbg_r5_read_dscr(regs);
+	if (dscr & (DSCR_SDABORT_I | DSCR_ADABORT_I)) {
+		/* Clear the bit */
+		dbg_r5_write_drcr(regs, 4);
+
+		if (verbose) {
+			unsigned r0, val;
+			printf ("memory access at 0x%08x failed, dscr: %08x",
+				addr, dscr);
+			disp_bits(dscr_xlat, dscr);
+
+			r0 = dbg_r5_read_reg(regs, 0);
+
+			/* Read DFSR Data Fault Status Register
+			   mrc	15, 0, r0, cr5, cr0, {0} */
+			dbg_r5_exec_insn(regs, 0xee150f10);
+			dbg_r5_exec_reg_to_dcc(regs, 0);
+			val = dbg_r5_read_dcc(regs);
+			printf (", DFSR: %08x", val);
+
+			/* Read DFAR Data Fault Address Register
+			   mrc	15, 0, r0, cr6, cr0, {0} */
+			dbg_r5_exec_insn(regs, 0xee160f10);
+			dbg_r5_exec_reg_to_dcc(regs, 0);
+			val = dbg_r5_read_dcc(regs);
+			printf (", DFAR: %08x\n", val);
+
+			dbg_r5_write_reg(regs, 0, r0);
+		}
+
+		return -1;
+	}
+	return 0;
+}
+
 /**
  * Write data to memory
  */
@@ -5141,7 +5290,7 @@ static int gdb_r5_handle_M(struct dbg_port *dbg,
 	dbg_r5_write_reg(dbg->dap, 0, addr);
 
 	if (addr % 4 == 0) {
-		for (; n >= 4; n -= 4, indata += 8) {
+		for (; n >= 4; n -= 4, indata += 8, addr += 4) {
 			uint32_t w;
 
 			ret = sscanf(indata, "%08"SCNx32, &w);
@@ -5152,9 +5301,12 @@ static int gdb_r5_handle_M(struct dbg_port *dbg,
 
 			/* str r1,[r0],#4 */
 			dbg_r5_exec_insn(dbg->dap, 0xe4801004);
+
+			if (gdb_check_mem_fault(dbg, addr) < 0)
+				break;
 		}
 	}
-	for (; n > 0; --n, indata += 2) {
+	for (; n > 0; --n, indata += 2, addr++) {
 		uint32_t b;
 
 		ret = sscanf(indata, "%02"SCNx32, &b);
@@ -5163,6 +5315,9 @@ static int gdb_r5_handle_M(struct dbg_port *dbg,
 		dbg_r5_write_reg(dbg->dap, 1, b);
 		/* strb r1,[r0],#1 */
 		dbg_r5_exec_insn(dbg->dap, 0xe4c01001);
+
+		if (gdb_check_mem_fault(dbg, addr) < 0)
+			break;
 	}
 
 	dbg_r5_write_reg(dbg->dap, 0, r0);
@@ -5196,24 +5351,13 @@ static int gdb_r5_handle_m(struct dbg_port *dbg,
 	r1 = dbg_r5_read_reg(dbg->dap, 1);
 	dbg_r5_write_reg(dbg->dap, 0, addr);
 	out->size = 0;
-	for (; n > 0; --n) {
+	for (; n > 0; --n, addr++) {
 		uint8_t b;
-		unsigned dscr;
 
 		/* ldrb r1,[r0],1 */
 		dbg_r5_exec_insn(dbg->dap, 0xe4d01001);
 
-		dscr = dbg_r5_read_dscr(dbg->dap);
-		if (dscr & (DSCR_SDABORT_I | DSCR_ADABORT_I)) {
-			if (verbose) {
-				printf ("read failed, dscr: %08x", dscr);
-				disp_bits(dscr_xlat, dscr);
-				printf ("\n");
-			}
-
-			/* Clear the bit */
-			dbg_r5_write_drcr(dbg->dap, 4);
-
+		if (gdb_check_mem_fault(dbg, addr) < 0) {
 			gdb_packet_put_str(out, "E01");
 			break;
 		}
@@ -5244,7 +5388,10 @@ static int gdb_r5_handle_G(struct dbg_port *dbg,
 	}
 
 	for (i = 0; i < NBR_R5_REGS; ++i) {
-		int ret = sscanf(in->data + 1 + i * 8, "%08"SCNx32, &regs[i]);
+		uint32_t v;
+		int ret = sscanf(in->data + 1 + i * 8, "%08"SCNx32, &v);
+
+		regs[i] = ntohl(v);
 
 		if (ret != 1) {
 			gdb_packet_put_str(out, "E02");
@@ -5252,11 +5399,21 @@ static int gdb_r5_handle_G(struct dbg_port *dbg,
 		}
 	}
 
-	dbg_r5_write_pc_via_r0(dbg->dap, ntohl(regs[15]));
-	dbg_r5_write_cpsr_via_r0(dbg->dap, ntohl(regs[41]));
+	dbg_r5_write_pc_via_r0(dbg->dap, regs[15]);
+	dbg_r5_write_cpsr_via_r0(dbg->dap, regs[41]);
 
 	for (i = 0; i < 15; ++i)
-		dbg_r5_write_reg(dbg->dap, i, ntohl(regs[i]));
+		dbg_r5_write_reg(dbg->dap, i, regs[i]);
+
+	if (verbose > 1) {
+		for (i = 0; i < 16; ++i) {
+			printf ("R%02u: %08x", i, regs[i]);
+			if (i % 4 == 3)
+				printf ("\n");
+			else
+				printf ("  ");
+		}
+	}
 
 	gdb_packet_put_str(out, "OK");
 
@@ -5302,6 +5459,196 @@ static int gdb_r5_handle_g(struct dbg_port *dbg,
 	return 0;
 }
 
+static void dbg_r5_disp_sctlr(void *regs)
+{
+	unsigned val, r0;
+
+	r0 = dbg_r5_read_reg(regs, 0);
+
+	val = dbg_r5_read_cp_via_r0(regs, 15, 0, 1, 0, 0);
+	printf("sctlr: %08x", val);
+	disp_bits(sctlr_xlat, val);
+	printf("\n");
+
+	/* Read ACTLR base register
+	   MRC p15, 0, <Rd>, c1, c0, 1 */
+	val = dbg_r5_read_cp_via_r0(regs, 15, 0, 1, 0, 1);
+	printf ("ACTLR: %08x\n", val);
+
+	dbg_r5_write_reg(regs, 0, r0);
+}
+
+static void dbg_r5_disp_mpu(void *regs)
+{
+	unsigned val, r0;
+	unsigned nreg;
+	unsigned i;
+
+	if (dbg_r5_halt(regs) < 0)
+		return;
+
+	r0 = dbg_r5_read_reg(regs, 0);
+
+	val = dbg_r5_read_cp_via_r0(regs, 15, 0, 0, 0, 0);
+	printf("midr: %08x\n", val);
+
+	val = dbg_r5_read_cp_via_r0(regs, 15, 0, 0, 0, 4);
+	nreg = (val >> 8) & 0xff;
+	printf("mpuir: %08x, nregions=%u\n", val, nreg);
+
+	val = dbg_r5_read_cp_via_r0(regs, 15, 1, 0, 0, 0);
+	printf("ccsidr: %08x\n", val);
+
+	val = dbg_r5_read_cp_via_r0(regs, 15, 1, 0, 0, 1);
+	printf("clidr: %08x\n", val);
+
+	val = dbg_r5_read_cp_via_r0(regs, 15, 0, 1, 0, 0);
+	printf("sctlr: %08x", val);
+	disp_bits(sctlr_xlat, val);
+	printf("\n");
+
+
+	/* Note: region 0 has lowest priority, region 15 has highest priority */
+	for (i = 0; i < nreg; i++) {
+	  unsigned sz;
+	  unsigned acc;
+	  unsigned addr;
+	  const char *ca;
+
+	  /* Set index.  */
+	  dbg_r5_write_cp_via_r0(regs, 15, 0, 6, 2, 0, i);
+
+	  /* Read size and enable bit. */
+	  sz = dbg_r5_read_cp_via_r0(regs, 15, 0, 6, 1, 2);
+	  if ((sz & 1) == 0)
+		  continue;
+
+	  addr = dbg_r5_read_cp_via_r0(regs, 15, 0, 6, 1, 0);
+	  acc = dbg_r5_read_cp_via_r0(regs, 15, 0, 6, 1, 4);
+
+	  printf("reg %02u: base: %08x-%08x [sz=%04x, acc=%08x ",
+		 i, addr, addr + (2 << ((sz >> 1) & 0x1f)) - 1, sz, acc);
+	  switch(acc & 0x3f) {
+	  case 0x00:
+		  ca = "SO";
+		  break;
+	  case 0x10:
+		  ca = "NC";
+		  break;
+	  case 0x0b:
+		  ca = "WB";
+		  break;
+	  default:
+		  ca = "??";
+		  break;
+	  }
+	  printf ("%s", ca);
+	  static const char * const rights[] = {
+		  "p:-- u:-- ",
+		  "p:rw u:-- ",
+		  "p:rw u:ro ",
+		  "p:rw u:rw ",
+
+		  "p:?? u:?? ",
+		  "p:ro u:-- ",
+		  "p:ro u:ro ",
+		  "p:?? u:?? "
+	  };
+	  printf(" %s %s]\n",
+		 acc & (1 << 12) ? "nx" : "  ",
+		 rights[(acc >>  8) & 0x7]);
+	}
+	dbg_r5_write_reg(regs, 0, r0);
+}
+
+static void dbg_r5_disp_tcm(void *regs)
+{
+	unsigned val, r0;
+
+	r0 = dbg_r5_read_reg(regs, 0);
+
+	/* Read BTCM base register
+	   MRC p15, 0, <Rd>, c9, c1, 0 */
+	val = dbg_r5_read_cp_via_r0(regs, 15, 0, 9, 1, 0);
+	printf ("BTCM:  %08x\n", val);
+
+	/* Read ATCM base register
+	   MRC p15, 0, <Rd>, c9, c1, 1 */
+	val = dbg_r5_read_cp_via_r0(regs, 15, 0, 9, 1, 1);
+	printf ("ATCM:  %08x\n", val);
+
+	/* Read ACTLR base register
+	   MRC p15, 0, <Rd>, c1, c0, 1 */
+	val = dbg_r5_read_cp_via_r0(regs, 15, 0, 1, 0, 1);
+	printf ("ACTLR: %08x\n", val);
+
+	dbg_r5_write_reg(regs, 0, r0);
+}
+
+static void dbg_r5_disp_dfault(void *regs)
+{
+	unsigned r0, val;
+
+	r0 = dbg_r5_read_reg(regs, 0);
+
+	/* Read DFSR Data Fault Status Register
+	   mrc	15, 0, r0, cr5, cr0, {0} */
+	dbg_r5_exec_mrc(regs, 15, 0, 5, 0, 0);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("DFSR:  %08x\n", val);
+
+	/* Read DFAR Data Fault Address Register
+	   mrc	15, 0, r0, cr6, cr0, {0} */
+	dbg_r5_exec_mrc(regs, 15, 0, 6, 0, 0);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("DFAR:  %08x\n", val);
+
+	/* Read ADFSR Data Fault Address Register
+	   mrc	15, 0, r0, cr5, cr1, {0} */
+	dbg_r5_exec_mrc(regs, 15, 0, 5, 1, 0);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("ADFSR: %08x", val);
+	printf (" (side: %x, sideext: %x)\n",
+		(val >> 22) & 0x3, (val >> 20) & 1);
+
+	dbg_r5_write_reg(regs, 0, r0);
+}
+
+static void dbg_r5_disp_ifault(void *regs)
+{
+	unsigned r0, val;
+
+	r0 = dbg_r5_read_reg(regs, 0);
+
+	/* Read IFSR Instruction Fault Status Register
+	   mrc	15, 0, r0, cr5, cr0, {1} */
+	dbg_r5_exec_mrc(regs, 15, 0, 5, 0, 1);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("IFSR:  %08x\n", val);
+
+	/* Read IFAR Instruction Fault Address Register
+	   mrc	15, 0, r0, cr6, cr0, {2} */
+	dbg_r5_exec_mrc(regs, 15, 0, 6, 0, 2);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("IFAR:  %08x\n", val);
+
+	/* Read AIFSR Aux Instruction Fault Address Register
+	   mrc	15, 0, r0, cr5, cr1, {1} */
+	dbg_r5_exec_mrc(regs, 15, 0, 5, 1, 0);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("AIFSR: %08x", val);
+	printf (" (side: %x, sideext: %x)\n",
+		(val >> 22) & 0x3, (val >> 20) & 1);
+
+	dbg_r5_write_reg(regs, 0, r0);
+}
+
 static const char * const xlat_moe[] = {
 	"halt", "bp", "0010", "bkpt",
 	"RQm", "0101", "0110", "0111",
@@ -5324,7 +5671,9 @@ static const char * const xlat_cpsr_mode[] = {
 
 static void dbg_disp_cpsr(unsigned cpsr)
 {
-	printf ("cpsr: %08x, mode: %s\n", cpsr, xlat_cpsr_mode[cpsr & 0x0f]);
+	printf ("cpsr: %08x, mode: %s", cpsr, xlat_cpsr_mode[cpsr & 0x0f]);
+	disp_bits (cpsr_xlat, cpsr);
+	printf("\n");
 }
 
 static void gdb_disp_halt_state(struct dbg_port *dbg, unsigned dscr)
@@ -5343,6 +5692,10 @@ static void gdb_disp_halt_state(struct dbg_port *dbg, unsigned dscr)
 	printf("raw pc: %08x\n", pc);
 
 	dbg_r5_write_reg(dbg->dap, 0, r0);
+
+	for (unsigned i = 0; i < 15; i++)
+		printf("R%02u: %08x\n", i, dbg_r5_read_reg(dbg->dap, i));
+
 }
 
 /**
@@ -5405,12 +5758,40 @@ static int gdb_r5_handle_qRcmd(struct dbg_port *dbg,
 	}
 
 	if (strcmp(buf, "help") == 0) {
-		strcpy(buf, "usage: reset | help\n");
+		strcpy(buf, "usage: reset | cpsr | sctlr | mpu | tcm "
+		       "| dfault | ifault | help\n");
 	}
 	else if (strcmp(buf, "reset") == 0) {
 		/* svc mode, mask IRQ, FIQ, ASABORT */
 		dbg_r5_write_cpsr_via_r0(dbg->dap, 0x1d3);
+		dbg_r5_write_pc_via_r0(dbg->dap, 0);
+		/* TODO: sctlr ? */
 		strcpy(buf, "cpsr initialized\n");
+	}
+	else if (strcmp(buf, "cpsr") == 0) {
+		unsigned dscr = dbg_r5_read_dscr(dbg->dap);
+		gdb_disp_halt_state(dbg, dscr);
+		strcpy(buf, "ok\n");
+	}
+	else if (strcmp(buf, "mpu") == 0) {
+		dbg_r5_disp_mpu(dbg->dap);
+		strcpy(buf, "ok\n");
+	}
+	else if (strcmp(buf, "tcm") == 0) {
+		dbg_r5_disp_tcm(dbg->dap);
+		strcpy(buf, "ok\n");
+	}
+	else if (strcmp(buf, "dfault") == 0) {
+		dbg_r5_disp_dfault(dbg->dap);
+		strcpy(buf, "ok\n");
+	}
+	else if (strcmp(buf, "ifault") == 0) {
+		dbg_r5_disp_ifault(dbg->dap);
+		strcpy(buf, "ok\n");
+	}
+	else if (strcmp(buf, "sctlr") == 0) {
+		dbg_r5_disp_sctlr(dbg->dap);
+		strcpy(buf, "ok\n");
 	}
 	else {
 		strcpy(buf,"unhandled mon command, try 'mon help'\n");
@@ -5731,7 +6112,7 @@ static int do_check_dbg_rpu(unsigned cpu_idx, int argc, char *argv[])
 		return -1;
 
 	rst_lpd = *(volatile unsigned *)(regs + CRL_APB_RST_LPD_TOP);
-	printf ("RST_LPD_TOP: %08x\n", rst_lpd);
+	printf ("CRL_APB RST_LPD_TOP: %08x\n", rst_lpd);
 	if (rst_lpd & (1 << cpu_idx)) {
 	    printf ("CPU under reset\n");
 	    rst_lpd &= ~(1 << cpu_idx);
@@ -5740,8 +6121,6 @@ static int do_check_dbg_rpu(unsigned cpu_idx, int argc, char *argv[])
 
 	val = *(volatile unsigned *)(regs + CRL_APB_CPU_R5_CTRL);
 	printf ("CRL_APB cpu_r5_ctrl:  0x%08x\n", val);
-	val = *(volatile unsigned *)(regs + CRL_APB_RST_LPD_TOP);
-	printf ("CRL_APB rst_lpd_top:  0x%08x\n", val);
 
 	regs = board->map(board, r5_addr);
 	if (regs == NULL)
@@ -5799,7 +6178,24 @@ static int do_check_dbg_rpu(unsigned cpu_idx, int argc, char *argv[])
 		}
 		if (timeout == 0) {
 			printf("cannot halt target!\n");
-			return -1;
+
+			if (dscr & DSCR_PipeAdv) {
+				printf ("Clear PipeAdv\n");
+				dbg_r5_write_drcr(regs, 8);
+				dscr = dbg_r5_read_dscr(regs);
+				if (dscr & DSCR_PipeAdv) {
+					printf ("failed to clear PipeAdv\n");
+					return -1;
+				}
+			}
+			printf ("Try to cancel memory request\n");
+			dbg_r5_write_drcr(regs, 0x11);
+
+			dscr = dbg_r5_read_dscr(regs);
+			if (!(dscr & 1)) {
+				printf ("Failed to halt\n");
+				return -1;
+			}
 		}
 		printf ("target halted\n");
 	}
@@ -5883,6 +6279,41 @@ static int do_check_dbg_rpu(unsigned cpu_idx, int argc, char *argv[])
 		dbg_r5_write_reg(regs, 0, r0);
 	}
 
+	/* read BTCM region register
+	   mrc p15, 0, r0, cr9, cr1, 0 */
+	dbg_r5_exec_insn(regs, 0xee190f11);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("BTCM: %08x\n", val);
+
+	/* read ATCM region register
+	   mrc p15, 0, r0, cr9, cr1, 1 */
+	dbg_r5_exec_insn(regs, 0xee190f31);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("ATCM: %08x\n", val);
+
+	/* read SACR region register
+	   mrc	15, 0, r0, cr15, cr0, {0} */
+	dbg_r5_exec_insn(regs, 0xee1f0f10);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("SACR: %08x\n", val);
+
+	/* Read DFSR Data Fault Status Register
+	   mrc	15, 0, r0, cr5, cr0, {0} */
+	dbg_r5_exec_insn(regs, 0xee150f10);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("DFSR: %08x\n", val);
+
+	/* Read DFAR Data Fault Address Register
+	   mrc	15, 0, r0, cr6, cr0, {0} */
+	dbg_r5_exec_insn(regs, 0xee160f10);
+	dbg_r5_exec_reg_to_dcc(regs, 0);
+	val = dbg_r5_read_dcc(regs);
+	printf ("DFAR: %08x\n", val);
+
         board->fini(board);
         return 0;
 }
@@ -5901,6 +6332,296 @@ static int do_check_dbg_rpu0(int argc, char *argv[])
 static int do_check_dbg_rpu1(int argc, char *argv[])
 {
 	return do_check_dbg_rpu(1, argc, argv);
+}
+
+static int do_clear_tcm_rpu(unsigned cpu_idx, int argc, char *argv[])
+{
+	/* Enable FPU and clear d0 */
+	static const uint32_t r5_fpu_init [] = {
+		0xee110f50, 	// mrc	15, 0, r0, cr1, cr0, {2}
+		0xe380060f, 	// orr	r0, r0, #(0xf << 20)	@ 0xf00000
+		0xee010f50,	// mcr	15, 0, r0, cr1, cr0, {2}
+		0xf57ff06f,	// isb	sy
+		0xeef83a10,	// vmrs	r3, fpexc
+		0xe3831101,	// orr	r1, r3, #(1<<30)	@ 0x40000000
+		0xeee81a10,	// vmsr	fpexc, r1
+		0xe3a01000,	// mov	r1, #0
+		0xec411b10,	// vmov	d0, r1, r1
+		0
+	};
+
+	struct dbg_port dbg;
+	void *regs;
+	unsigned r5_addr = R5_DBG_0_BASEADDR | (cpu_idx << 13);
+	unsigned i;
+
+	/* Map CRL */
+	if (dbg_init_rpu(&dbg, r5_addr, &argc, argv) < 0)
+		return -1;
+	regs = dbg.dap;
+
+	if (dbg_r5_halt(regs) < 0)
+		return -1;
+
+	for (i = 0; r5_fpu_init[i]; i++)
+		dbg_r5_exec_insn(regs, r5_fpu_init[i]);
+
+	/* Clear ATCM */
+	dbg_r5_write_reg(regs, 0, 0);
+	for (i = 0; i < 0x10000 / 8; i++) {
+		/* vstr    d0, [r0] */
+		dbg_r5_exec_insn(regs, 0xed800b00);
+
+		/* add     r0, r0, #8 */
+		dbg_r5_exec_insn(regs, 0xe2800008);
+	}
+
+	/* Clear BTCM */
+	dbg_r5_write_reg(regs, 0, 0x20000);
+	for (i = 0; i < 0x10000 / 8; i++) {
+		/* vstr    d0, [r0] */
+		dbg_r5_exec_insn(regs, 0xed800b00);
+
+		/* add     r0, r0, #8 */
+		dbg_r5_exec_insn(regs, 0xe2800008);
+
+		/* strd    r0, [r2], #8 */
+		/* dbg_r5_exec_insn(regs, 0xe0c200f8); */
+	}
+
+	return 0;
+}
+
+static int do_clear_tcm_rpu0(int argc, char *argv[])
+{
+	return do_clear_tcm_rpu(0, argc, argv);
+}
+
+static int do_clear_tcm_rpu1(int argc, char *argv[])
+{
+	return do_clear_tcm_rpu(1, argc, argv);
+}
+
+static void help_clear_tcm(const char *cmd)
+{
+	fprintf(stderr, "usage: %s %s BOARD-OPTIONS [options]\n",
+		progname, cmd);
+}
+
+static void do_rpu_dfault(struct dbg_port *dbg, int argc, char **argv)
+{
+	void *regs = dbg->dap;
+
+	if (dbg_r5_halt(regs) < 0)
+		return;
+
+	dbg_r5_disp_dfault(regs);
+}
+
+static void do_rpu_tcm(struct dbg_port *dbg, int argc, char **argv)
+{
+	void *regs = dbg->dap;
+
+	if (dbg_r5_halt(regs) < 0)
+		return;
+
+	dbg_r5_disp_tcm(regs);
+}
+
+static void do_rpu_mpu(struct dbg_port *dbg, int argc, char **argv)
+{
+	void *regs = dbg->dap;
+
+	if (dbg_r5_halt(regs) < 0)
+		return;
+
+	dbg_r5_disp_mpu(regs);
+}
+
+static int parse_uns(const char *str, char *name, unsigned *res)
+{
+	char *e;
+
+	*res = strtoul(str, &e, 0);
+	if (*e != 0) {
+		printf ("cannot parse %s '%s'\n", name, str);
+		return -1;
+	}
+	return 0;
+}
+
+static void do_rpu_rd(struct dbg_port *dbg, int argc, char **argv)
+{
+	void *regs = dbg->dap;
+	unsigned val, r0, r1;
+	unsigned addr, len;
+
+	if (argc < 2) {
+		printf ("missing address\n");
+		return;
+	}
+
+	if (parse_uns(argv[1], "address", &addr) < 0)
+		return;
+
+	if (argc > 2) {
+		if (parse_uns(argv[2], "length", &len) < 0)
+			return;
+	}
+	else
+		len = 1;
+
+	if (dbg_r5_halt(regs) < 0)
+		return;
+
+	r0 = dbg_r5_read_reg(dbg->dap, 0);
+	r1 = dbg_r5_read_reg(dbg->dap, 1);
+
+	dbg_r5_write_reg(dbg->dap, 0, addr);
+
+	for (; len != 0; len--) {
+		printf("[%08x]=", addr);
+
+		/* ldrb r1,[r0],1 */
+		dbg_r5_exec_insn(dbg->dap, 0xe4d01001);
+		if (gdb_check_mem_fault(dbg, addr) < 0)
+			printf("Fault\n");
+		else {
+			val = dbg_r5_read_reg(dbg->dap, 1);
+			printf("%02x\n", val);
+		}
+
+		addr++;
+	}
+	dbg_r5_write_reg(dbg->dap, 0, r0);
+	dbg_r5_write_reg(dbg->dap, 1, r1);
+}
+
+static void do_rpu_wr(struct dbg_port *dbg, int argc, char **argv)
+{
+	void *regs = dbg->dap;
+	unsigned val, r0, r1;
+	unsigned addr;
+
+	if (argc < 3) {
+		printf ("missing address value\n");
+		return;
+	}
+
+	if (parse_uns(argv[1], "address", &addr) < 0)
+		return;
+
+	if (parse_uns(argv[2], "value", &val) < 0)
+		return;
+
+	if (dbg_r5_halt(regs) < 0)
+		return;
+
+	r0 = dbg_r5_read_reg(dbg->dap, 0);
+	r1 = dbg_r5_read_reg(dbg->dap, 1);
+
+	dbg_r5_write_reg(dbg->dap, 0, addr);
+	dbg_r5_write_reg(dbg->dap, 1, val);
+
+	/* str r1,[r0],#4 */
+	dbg_r5_exec_insn(dbg->dap, 0xe4801004);
+
+	if (gdb_check_mem_fault(dbg, addr) < 0)
+		printf("Fault\n");
+
+	dbg_r5_write_reg(dbg->dap, 0, r0);
+	dbg_r5_write_reg(dbg->dap, 1, r1);
+}
+
+struct tool_rpu {
+	const char *name;
+	const char *short_help;
+	void (*run)(struct dbg_port *dbg, int argc, char **argv);
+};
+
+static struct tool_rpu tools_rpu[] = {
+  {
+	  "dfault",
+	  "disp data fault registers",
+	  do_rpu_dfault
+  },
+  {
+	  "tcm",
+	  "disp TCM registers",
+	  do_rpu_tcm
+  },
+  {
+	  "mpu",
+	  "disp MPU registers",
+	  do_rpu_mpu
+  },
+  {
+	  "rd",
+	  "ADDR [LEN]: read memory",
+	  do_rpu_rd
+  },
+  {
+	  "wr",
+	  "ADDR VAL: write memory",
+	  do_rpu_wr
+  },
+  {
+	  NULL, NULL, NULL
+  }
+};
+
+static int do_rpu(unsigned cpu_idx, int argc, char *argv[])
+{
+	struct dbg_port dbg;
+	const struct tool_rpu *cmd;
+	unsigned r5_addr = R5_DBG_0_BASEADDR | (cpu_idx << 13);
+	unsigned i;
+
+	if (dbg_init_rpu(&dbg, r5_addr, &argc, argv) < 0)
+		return -1;
+
+	if (argc == 1) {
+		printf("%s %s: missing sub-command\n", progname, argv[0]);
+		for (i = 0; tools_rpu[i].name; i++)
+			printf ("%-8s  %s\n", tools_rpu[i].name, tools_rpu[i].short_help);
+		return -1;
+	}
+
+	cmd = NULL;
+	for (i = 0; tools_rpu[i].name; i++)
+		if (!strcmp(tools_rpu[i].name, argv[1])) {
+			cmd = &tools_rpu[i];
+			break;
+		}
+	if (cmd == NULL) {
+		printf ("%s %s: unknown command '%s'\n", progname, argv[0], argv[1]);
+		return -1;
+	}
+
+
+	remove_arg1(&argc, argv);
+
+	(*cmd->run)(&dbg, argc, argv);
+
+	board->fini(board);
+
+	return 0;
+}
+
+static int do_rpu0(int argc, char *argv[])
+{
+	return do_rpu(0, argc, argv);
+}
+
+static int do_rpu1(int argc, char *argv[])
+{
+	return do_rpu(1, argc, argv);
+}
+
+static void help_rpu(const char *cmd)
+{
+	fprintf(stderr, "usage: %s %s SUB-CMD BOARD-OPTIONS [options]\n",
+		progname, cmd);
 }
 
 static int do_rd(int argc, char *argv[])
@@ -6038,6 +6759,34 @@ static const struct tool_base tool_check_dbg_rpu1 = {
         help_check_dbg
 };
 
+static const struct tool_base tool_clear_tcm_rpu0 = {
+        "clear-tcm-rpu0",
+        "Check ATCM and BTCM of cortex-r5 ZynqUS+ RPU0",
+        do_clear_tcm_rpu0,
+        help_clear_tcm
+};
+
+static const struct tool_base tool_clear_tcm_rpu1 = {
+        "clear-tcm-rpu1",
+        "Check ATCM and BTCM of cortex-r5 ZynqUS+ RPU1",
+        do_clear_tcm_rpu1,
+        help_clear_tcm
+};
+
+static const struct tool_base tool_rpu0 = {
+        "rpu0",
+        "Sub commands for cortex-r5 ZynqUS+ RPU0",
+        do_rpu0,
+        help_rpu
+};
+
+static const struct tool_base tool_rpu1 = {
+        "rpu1",
+        "Sub commands for cortex-r5 ZynqUS+ RPU1",
+        do_rpu1,
+        help_rpu
+};
+
 static const struct tool_base tool_rd = {
         "rd",
         "Read a word on the local bus",
@@ -6088,6 +6837,10 @@ static const struct tool_base *tools[] = {
 	&tool_rd,
 	&tool_check_dbg_rpu0,
 	&tool_check_dbg_rpu1,
+	&tool_clear_tcm_rpu0,
+	&tool_clear_tcm_rpu1,
+	&tool_rpu0,
+	&tool_rpu1,
 #ifndef SUPPORT_WRS
 	&tool_wdiags,
         &tool_aux_logger,
