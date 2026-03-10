@@ -737,16 +737,18 @@ static unsigned cernvme_slot_to_addr(unsigned slot, unsigned verbose)
 	return res;
 }
 
+static void board_cernvme_default(struct board_cernvme *board)
+{
+	board->offset = 0;
+	board->data_width = 32;
+	board->am = 0x39;
+	board->addr = ~0;
+}
+
 static int board_cernvme_init_common(struct board *board_base,
 				     int *argc, char *argv[])
 {
 	struct board_cernvme *board = (struct board_cernvme *)board_base;
-	unsigned verbose = 0;
-
-	board->data_width = 32;
-	board->am = 0x39;
-	board->offset = 0;
-	board->addr = ~0;
 
         while (*argc > 2) {
                 if (argv[1][0] != '-')
@@ -845,8 +847,10 @@ static int board_cernvme_init(struct board *board_base,
                               int *argc, char *argv[])
 {
 	struct board_cernvme *board = (struct board_cernvme *)board_base;
+	int res;
 
-	int res = board_cernvme_init_common(board_base, argc, argv);
+	board_cernvme_default(board);
+	res = board_cernvme_init_common(board_base, argc, argv);
 	if (res < 0)
 		return res;
 
@@ -903,8 +907,10 @@ static int board_cernvme_le_init(struct board *board_base,
 				  int *argc, char *argv[])
 {
 	struct board_cernvme *board = (struct board_cernvme *)board_base;
+	int res;
 
-	int res = board_cernvme_init_common(board_base, argc, argv);
+	board_cernvme_default(board);
+	res = board_cernvme_init_common(board_base, argc, argv);
 	if (res < 0)
 		return res;
 
@@ -936,6 +942,23 @@ static struct board_cernvme board_cernvme_le =
 		0
 	},
 };
+
+static int wren_vme_init(struct board *board_base,
+			 int *argc, char *argv[])
+{
+	struct board_cernvme *board = (struct board_cernvme *)board_base;
+	int res;
+
+	board_cernvme_default(board);
+	board->offset = 0x1000;
+
+	res = board_cernvme_init_common(board_base, argc, argv);
+	if (res < 0)
+		return res;
+
+	board->parent.is_be = 0;
+	return 0;
+}
 
 static void *wren_vme_map(struct board *base_board, unsigned addr)
 {
@@ -990,7 +1013,7 @@ static struct board_cernvme board_wren_vme =
 		/* board */
 		{
 			"wren-vme",
-			board_cernvme_le_init,
+			wren_vme_init,
 			board_cernvme_fini,
 			board_cernvme_le_help,
 			mem_readl,
