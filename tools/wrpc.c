@@ -5122,6 +5122,20 @@ static void dbg_r5_write_cp_via_r0(void *regs,
 	dbg_r5_exec_mcr(regs, coproc, opc1, crn, crm, opc2);
 }
 
+static const char * const xlat_moe[] = {
+	"halt", "bp", "0010", "bkpt",
+	"RQm", "0101", "0110", "0111",
+	"1000", "1001", "wp", "1011",
+	"1100", "1101", "1110", "1111" };
+
+static void dbg_disp_dscr(unsigned dscr)
+{
+	unsigned moe = (dscr >> 2) & 0x0f;
+	printf("dscr: %08x, moe:%s", dscr, xlat_moe[moe]);
+	disp_bits(dscr_xlat, dscr);
+	printf("\n");
+}
+
 static int dbg_r5_halt(void *regs)
 {
 	unsigned timeout;
@@ -5672,19 +5686,6 @@ static void dbg_r5_disp_ifault(void *regs)
 	dbg_r5_write_reg(regs, 0, r0);
 }
 
-static const char * const xlat_moe[] = {
-	"halt", "bp", "0010", "bkpt",
-	"RQm", "0101", "0110", "0111",
-	"1000", "1001", "wp", "1011",
-	"1100", "1101", "1110", "1111" };
-
-static void dbg_disp_dscr(unsigned dscr)
-{
-	unsigned moe = (dscr >> 2) & 0x0f;
-	printf("dscr: %08x, moe:%s", dscr, xlat_moe[moe]);
-	disp_bits(dscr_xlat, dscr);
-}
-
 static const char * const xlat_cpsr_mode[] = {
 	"user", "fiq", "irq", "scv",
 	"0100", "0101", "mon", "abt",
@@ -5706,7 +5707,6 @@ static void gdb_disp_halt_state(struct dbg_port *dbg, unsigned dscr)
 	unsigned pc;
 
 	dbg_disp_dscr(dscr);
-	printf("\n");
 	r0 = dbg_r5_read_reg(dbg->dap, 0);
 
 	cpsr = dbg_r5_read_cpsr_via_r0(dbg->dap);
@@ -6182,7 +6182,6 @@ static int do_check_dbg_rpu(unsigned cpu_idx, int argc, char *argv[])
 	}
 	else
 		printf ("Halting debug-mode already enabled\n");
-
 
 	if (dscr & DSCR_HALTED)
 		printf ("Target is already halted!\n");
