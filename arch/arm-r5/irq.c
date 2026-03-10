@@ -16,10 +16,6 @@
 #define SPLL_IRQ 121
 
 
-/* CPSR bits */
-#define R5_CPSR_FIQ (1<<6)
-#define R5_CPSR_IRQ (1<<7)
-
 /* GICv1 */
 #define RCPU_GIC 0xf9000000
 #define ICDDCR	   *((uint32_t *)(RCPU_GIC  + 0x000)) //Distributor Control
@@ -62,7 +58,6 @@ init_irq(void)
     ICCPMR = 0xff;
 
     /* Disable interrupt */
-    ICDIPTR(SPLL_IRQ / 4) &= ~(0x3 << (8 * (SPLL_IRQ & 0x3)));
     ICDICER(SPLL_IRQ / 32) = 1 << (SPLL_IRQ & 0x1f);
 
     /* Set sensitivity to level (00) */
@@ -75,6 +70,7 @@ init_irq(void)
 
     /* Target my CPU */
     cpu = read_mpidr() & 0xff;
+    ICDIPTR(SPLL_IRQ / 4) &= ~(0xff << (8 * (SPLL_IRQ & 0x3)));
     ICDIPTR(SPLL_IRQ / 4) |= (1 << cpu) << (8 * (SPLL_IRQ & 0x3));
 
     /* Enable */
@@ -82,6 +78,8 @@ init_irq(void)
 
     /* Enable distributor */
     ICDDCR = 1;
+
+    /* TODO: EOI interrupt if active ? */
 }
 
 void disable_irq(void)
