@@ -2333,6 +2333,8 @@ static void help_spll_recorder(const char *cmd)
 
 static const char *dbg_source_to_string(int src)
 {
+	static char str[16];
+
 	switch (src)
 	{
 	case SPLL_DBG_SRC_HELPER:
@@ -2352,12 +2354,15 @@ static const char *dbg_source_to_string(int src)
 	case SPLL_DBG_SRC_RAW:
 		return "raw";
 	default:
-		return "<unknown?>";
+		snprintf(str, sizeof(str), "%d", src);
+		return str;
 	}
 }
 
 static const char *dbg_signal_to_string(int src)
 {
+	static char str[16];
+
 	switch (src)
 	{
 	case SPLL_DBG_SIGNAL_ERR:
@@ -2366,6 +2371,8 @@ static const char *dbg_signal_to_string(int src)
 		return "y";
 	case SPLL_DBG_SIGNAL_REF:
 		return "ref";
+	case SPLL_DBG_SIGNAL_DT:
+		return "dt";
 	case SPLL_DBG_SIGNAL_TAG:
 		return "tag";
 	case SPLL_DBG_SIGNAL_SAMPLE_ID:
@@ -2378,13 +2385,18 @@ static const char *dbg_signal_to_string(int src)
 		return "ph_targ";
 	case SPLL_DBG_SIGNAL_SRC:
 		return "source";
+	case SPLL_DBG_SIGNAL_MISC:
+		return "misc";
 	default:
-		return "<unknown?>";
+		snprintf(str, sizeof(str), "%d", src);
+		return str;
 	}
 }
 
 static const char *dbg_event_to_string(int src)
 {
+	static char str[16];
+
 	switch (src)
 	{
 	case SPLL_DBG_EVT_GAIN_SWITCH:
@@ -2393,10 +2405,41 @@ static const char *dbg_event_to_string(int src)
 		return "lock-acquired";
 	case SPLL_DBG_EVT_LOCK_LOSS:
 		return "lock-lost";
+	case SPLL_DBG_EVT_FREQ_LOCK:
+		return "freq-lock";
 	case SPLL_DBG_EVT_START:
 		return "start";
+	case SPLL_DBG_EVT_SWEEP_START:
+		return "sweep-start";
+	case SPLL_DBG_EVT_SWEEP_DONE:
+		return "sweep-done";
+	case SPLL_DBG_EVT_T24P_CALIB:
+		return "t24p-calib";
+	case SPLL_DBG_EVT_T24P_DONE:
+		return "t24p-done";
+	case SPLL_DBG_EVT_SERVO_STATE + 0:
+		return "servo-uninitialized";
+	case SPLL_DBG_EVT_SERVO_STATE + 1:
+		return "servo-sync-tai";
+	case SPLL_DBG_EVT_SERVO_STATE + 2:
+		return "servo-sync-nsec";
+	case SPLL_DBG_EVT_SERVO_STATE + 3:
+		return "servo-sync-phase";
+	case SPLL_DBG_EVT_SERVO_STATE + 4:
+		return "servo-track-phase";
+	case SPLL_DBG_EVT_SERVO_STATE + 5:
+		return "servo-wait-stable";
+	case SPLL_DBG_EVT_PTP_SYNC:
+		return "ptp-sync";
+	case SPLL_DBG_EVT_PTP_RESP:
+		return "ptp-resp";
+	case SPLL_DBG_EVT_PHY_READY:
+		return "phy-ready";
+	case SPLL_DBG_EVT_PHY_DOWN:
+		return "phy-down";
 	default:
-		return "<unknown?>";
+		snprintf(str, sizeof(str), "%d", src);
+		return str;
 	}
 }
 
@@ -2432,7 +2475,7 @@ void spll_dump_debug_data(const uint32_t *buf, size_t size)
 		switch (sig)
 		{
 		case SPLL_DBG_SIGNAL_ERR:
-		case SPLL_DBG_SIGNAL_REF:
+		case SPLL_DBG_SIGNAL_DT:
 			value = signext32(value_raw, 23);
 			break;
 		default:
@@ -2446,11 +2489,9 @@ void spll_dump_debug_data(const uint32_t *buf, size_t size)
 		}
 
 		if (sig == SPLL_DBG_SIGNAL_EVENT)
-		{
 			printf("event=%s ", dbg_event_to_string(value));
-		}
-
-		printf("%s=%d ", dbg_signal_to_string(sig), value);
+		else
+			printf("%s=%d ", dbg_signal_to_string(sig), value);
 
 		if (SPLL_DBG_IS_LAST_RECORD(x))
 		{
