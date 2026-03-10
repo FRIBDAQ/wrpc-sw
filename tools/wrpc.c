@@ -1004,6 +1004,89 @@ static struct board_cernvme board_wren_vme =
 	},
 };
 
+static uint32_t wr2rf_readl(struct board *base_board, unsigned reg)
+{
+	struct board_mem *board = (struct board_mem *)base_board;
+	volatile uint16_t *addr = (volatile uint16_t *)(board->base + reg);
+	uint32_t l, h, res;
+
+	/* A 16b VME bus with special circuitery to get an atomic 32b value */
+	l = addr[0];
+	h = addr[1];
+	res = (l << 16) | h;
+	return ntohl(res);
+}
+
+static void wr2rf_writel(struct board *base_board, unsigned reg, uint32_t val)
+{
+	struct board_mem *board = (struct board_mem *)base_board;
+        volatile uint16_t *addr = (volatile uint16_t *)(board->base + reg);
+
+        val = htonl(val);
+
+        addr[1] = val & 0xffff;
+	addr[0] = val >> 16;
+}
+
+static int board_wr2rf_init(struct board *board_base,
+                            int *argc, char *argv[])
+{
+	struct board_cernvme *board = (struct board_cernvme *)board_base;
+
+        unsigned vme_addr;
+
+        if (*argc > 2
+            && (!strcmp(argv[1], "-s") || !strcmp(argv[1], "--slot"))) {
+                char *e;
+                unsigned slot;
+
+                remove_arg1(argc, argv);
+                slot = strtoul(argv[1], &e, 0);
+                if (*e != 0) {
+                        fprintf(stderr, "invalid slot '%s'\n", argv[1]);
+                        return -1;
+                }
+                vme_addr = slot << 19;
+                remove_arg1(argc, argv);
+        }
+        else {
+                fprintf(stderr, "missing slot number for wr2rf\n");
+                return -1;
+        }
+
+	board->am = 0x39;
+	board->data_width = 16;
+	board->addr = vme_addr;
+	board->offset = 0x2000;
+
+        return cernvme_map_wrpc(board);
+}
+
+static void board_wr2rf_help(void)
+{
+        printf("wr2rf board (using CERN-vme bridge)\n");
+        printf(" -s, --slot ADDR      board slot (512KB steps)\n");
+}
+
+static struct board_cernvme board_wr2rf =
+{
+	{
+		{
+			"wr2rf",
+			board_wr2rf_init,
+			board_cernvme_fini,
+			board_wr2rf_help,
+			wr2rf_readl,
+			wr2rf_writel
+		},
+		NULL,
+		0,
+		NULL,
+		0
+	},
+};
+#endif
+
 struct board_wren_pcie {
 	struct board_mem parent;
 	struct pci_slot slot;
@@ -1129,7 +1212,7 @@ static void board_wren_pcie_help(void)
         printf(" -s [domain:]bus:slot[.func]\n");
 }
 
-static struct board_cernvme board_wren_pcie =
+static struct board_pci board_wren_pcie =
 {
 	/* board_mem */
 	{
@@ -1147,89 +1230,6 @@ static struct board_cernvme board_wren_pcie =
 		NULL, 0, NULL, 0
 	},
 };
-
-static uint32_t wr2rf_readl(struct board *base_board, unsigned reg)
-{
-	struct board_mem *board = (struct board_mem *)base_board;
-	volatile uint16_t *addr = (volatile uint16_t *)(board->base + reg);
-	uint32_t l, h, res;
-
-	/* A 16b VME bus with special circuitery to get an atomic 32b value */
-	l = addr[0];
-	h = addr[1];
-	res = (l << 16) | h;
-	return ntohl(res);
-}
-
-static void wr2rf_writel(struct board *base_board, unsigned reg, uint32_t val)
-{
-	struct board_mem *board = (struct board_mem *)base_board;
-        volatile uint16_t *addr = (volatile uint16_t *)(board->base + reg);
-
-        val = htonl(val);
-
-        addr[1] = val & 0xffff;
-	addr[0] = val >> 16;
-}
-
-static int board_wr2rf_init(struct board *board_base,
-                            int *argc, char *argv[])
-{
-	struct board_cernvme *board = (struct board_cernvme *)board_base;
-
-        unsigned vme_addr;
-
-        if (*argc > 2
-            && (!strcmp(argv[1], "-s") || !strcmp(argv[1], "--slot"))) {
-                char *e;
-                unsigned slot;
-
-                remove_arg1(argc, argv);
-                slot = strtoul(argv[1], &e, 0);
-                if (*e != 0) {
-                        fprintf(stderr, "invalid slot '%s'\n", argv[1]);
-                        return -1;
-                }
-                vme_addr = slot << 19;
-                remove_arg1(argc, argv);
-        }
-        else {
-                fprintf(stderr, "missing slot number for wr2rf\n");
-                return -1;
-        }
-
-	board->am = 0x39;
-	board->data_width = 16;
-	board->addr = vme_addr;
-	board->offset = 0x2000;
-
-        return cernvme_map_wrpc(board);
-}
-
-static void board_wr2rf_help(void)
-{
-        printf("wr2rf board (using CERN-vme bridge)\n");
-        printf(" -s, --slot ADDR      board slot (512KB steps)\n");
-}
-
-static struct board_cernvme board_wr2rf =
-{
-	{
-		{
-			"wr2rf",
-			board_wr2rf_init,
-			board_cernvme_fini,
-			board_wr2rf_help,
-			wr2rf_readl,
-			wr2rf_writel
-		},
-		NULL,
-		0,
-		NULL,
-		0
-	},
-};
-#endif
 
 static struct board *boards[] = {
 	&board_pci.parent.parent,
