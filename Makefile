@@ -136,6 +136,7 @@ export sdbfsimg-y
 
 sdbfs_swap_bytes-$(CONFIG_ARCH_LM32) =
 sdbfs_swap_bytes-$(CONFIG_ARCH_RISCV) = -e
+sdbfs_swap_bytes-$(CONFIG_ARCH_ARM_R5) = -e
 
 all:
 
@@ -190,7 +191,8 @@ GIT_USR = $(shell whoami)@$(shell hostname)
 endif
 
 all:
-all: tools $(OUTPUT).elf $(arch-files-y)
+#all: tools $(OUTPUT).elf $(arch-files-y)
+all: $(OUTPUT).elf $(arch-files-y)
 
 .PRECIOUS: %.elf %.bin
 .PHONY: all tools clean extest liblinux

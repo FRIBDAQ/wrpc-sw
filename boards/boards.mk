@@ -21,6 +21,7 @@ obj-$(CONFIG_TARGET_BABYWR) += boards/babywr/board.o
 obj-$(CONFIG_TARGET_PXIE_FMC) += boards/pxie-fmc/board.o
 obj-$(CONFIG_TARGET_WR2RF_VME) += boards/wr2rf-vme/board.o  boards/wr2rf-vme/sdbfs-custom-image.o
 obj-$(CONFIG_TARGET_AMD_DEVBOARD) += boards/amd-devboard/board.o
+obj-$(CONFIG_TARGET_CTS) += boards/cts/board.o boards/generic/generic-storage.o dev/24aa256.o
 
 boards/ertm14/sdbfs-custom-image.o: boards/ertm14/sdbfs-custom-image.h
 boards/wr2rf-vme/sdbfs-custom-image.o: boards/wr2rf-vme/sdbfs-custom-image.h

@@ -18,8 +18,15 @@
     #define DEV_BASE	0x40000
 #elif defined CONFIG_ARCH_ARM_R5
     /* Very board specific */
+#  if defined CONFIG_TARGET_GENERIC_PHY_16BIT || defined CONFIG_TARGET_CTS
+    /* KR260: the WR core sits behind the PS M_AXI_HPM0_LPD window at
+       0x8000_0000.  See top/kr260_ref_design/mpsoc_map.cheby in wr-cores. */
+    #define DEV_BASE	0x80003000
+    #define BASE_AUXWB	0x80004000
+#  else
     #define DEV_BASE	0x80400000
     #define BASE_AUXWB	0x80408000
+#  endif
 #else
     #error Wrong CPU architecture. Must define either LM32 or RISC-V.
 #endif
@@ -59,6 +66,8 @@
 #  include "boards/wr2rf-vme/board-config.h"
 #elif defined(CONFIG_TARGET_AMD_DEVBOARD)
 #  include "boards/amd-devboard/board-config.h"
+#elif defined(CONFIG_TARGET_CTS)
+#  include "boards/cts/board-config.h"
 #else
 #  error no board defined
 #endif

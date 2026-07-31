@@ -96,6 +96,9 @@ config TARGET_AMD_DEVBOARD
 	help
 	  Currently supported: ZC706, ZCU102, ZCU106
 
+config TARGET_CTS
+	bool "CTS"
+
 endchoice
 
 config WR_NODE_SIM

@@ -15,6 +15,13 @@ _IRQ_STACK_SIZE = 0x200;
 
 SECTIONS
 {
+    /* No unwinding in this freestanding build: ld would otherwise emit
+       .ARM.exidx at a default LMA that overlaps .data.  */
+    /DISCARD/ : {
+	*(.ARM.exidx*)
+	*(.ARM.extab*)
+    }
+
     .text : AT (ATCM_LOADADDR) {
 	KEEP(*(.vector_table))
 	*(.text)
