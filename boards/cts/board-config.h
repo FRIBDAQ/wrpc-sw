@@ -51,19 +51,22 @@
 #define CONSOLE_UART_BAUDRATE 115200
 
 /* Use the board-local sdbfs image (boards/cts/sdbfs/) instead of the
- * generic tools/sdbfs one. */
+ * generic tools/sdbfs one.  It drops the mac-address and calibration files:
+ *   - mac-address is unused on CTS (MAC comes from the 24AA256 EEPROM at
+ *     offset 0x7F7A, see board.c: cts_get_mac);
+ *   - calibration is not stored (t24p is measured live at runtime).
+ * Wired in boards/boards.mk (sdbfs-custom-image.{c,h}). */
+#define BOARD_USE_CUSTOM_SDBFS 1
 
-/* Maximum number of records in the sdb filesystem (standard WR set:
- * interconnect + mac-address + wr-init + sfp-database + calibration). */
-#define SDBFS_REC 5
+/* Number of records in the sdb filesystem: interconnect + wr-init +
+ * sfp-database + calibration (must match the file count in boards/cts/sdbfs/). */
+#define SDBFS_REC 4
 
-/* Storage: external I2C EEPROM (24AA256, 32 KB) on the WR-core FMC-EEPROM
- * I2C, which the gateware brings out on P2_HDIO1_SDA / P2_HDIO2_SCL.
- * EEPROM_STORAGE=1 selects the generic I2C storage path (2-byte address,
- * see boards/generic/generic-storage.c -> generic_board_i2c_storage).
- * I2C address 0x54 (24AA256 A2/A1/A0 = 1/0/0 on this board). */
-#define FMC_EEPROM_ADR 0x54
-#define EEPROM_STORAGE 1
+/* Storage: two 25AA02E48 SPI EEPROMs (256 B each) concatenated into one
+ * flat 480 B SDBFS device, plus the MAC from chip0's factory EUI-48.
+ * All handled board-locally in boards/cts/board.c (cts_storage_init /
+ * cts_get_mac) -- neither the generic I2C nor the SPI-flash storage path
+ * is used, so EEPROM_STORAGE / FMC_EEPROM_ADR are not defined here. */
 
 /* ---------------------------------------------------------------------
  * CTS-specific hardware wiring

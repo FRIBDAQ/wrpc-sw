@@ -1,0 +1,36 @@
+#
+# CTS board-local SDBFS image.
+#
+# Four records: interconnect (this directory) + wr-init + sfp-database +
+# calibration, i.e. SDBFS_REC = 4 (see boards/cts/board-config.h).
+#
+# It targets the 480 B two-25AA02E48 device (2 x 240 B usable).  With the
+# 16-byte-aligned relocation done by storage_sdbfs_format (dev/storage.c), the
+# runtime layout is:
+#   directory 4*64 = 256   [dev 0x000..0x0FF]
+#   wr-init   (48)  @ 0x100
+#   sfp-db    (100) @ 0x140   (1 count + SFPS_MAX*33 = 1 + 3*33, SFPS_MAX=3)
+#   calib     (44)  @ 0x1B0   (sizeof wrc_cal_data_t, CAL_MAX_PARAMS=4)
+#   end            @ 0x1DC  (476 <= 480)  ok
+#
+# NB: the 4th directory record (dev 0xC0 -> chip0 0xC0) and calibration
+# (chip1 0xC0..) fall in the 25AA02E48 BP0-protected upper 1/4, so this layout
+# REQUIRES the block-protect clear at init (board.c: ee_clear_bp).
+#
+# We start at zero *within* our own space (the EEPROM subdirectory).
+.
+	position = 0
+
+wr-init
+	write = 1
+	maxsize = 48
+
+# 1 count byte + SFPS_MAX (3) * sizeof(s_sfpinfo)=33  = 100 bytes
+sfp-database
+	write = 1
+	maxsize = 100
+
+# sizeof(wrc_cal_data_t) with CAL_MAX_PARAMS=4 = 12 + 4*8 = 44 bytes
+calibration
+	write = 1
+	maxsize = 44

@@ -15,7 +15,8 @@
 
 // calibration parameter definitions. Board-specific.
 // fixme: move MAX_CAL_PARAMS to BSP
-#define CAL_MAX_PARAMS 12
+// CTS: reduced from 12 to fit the two-25AA02E48 480 B SDBFS (44 B cal file).
+#define CAL_MAX_PARAMS 4
 #define CAL_FILE_MAGIC 0xcafebabe
 
 #define ASCII_TO_U32(a, b, c, d) ((((uint32_t)(a)&0xff) << 24) |     \
@@ -35,7 +36,8 @@
 
 #define SFP_SECTION_PATTERN 0xdeadbeef
 
-#define SFPS_MAX 4
+// CTS: reduced from 4 to fit the two-25AA02E48 480 B SDBFS (100 B sfp-db file).
+#define SFPS_MAX 3
 
 
 #define EE_RET_I2CERR -1

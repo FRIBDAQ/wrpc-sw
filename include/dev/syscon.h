@@ -48,6 +48,7 @@ extern const struct gpio_pin pin_sysc_btn2;
 extern const struct gpio_pin pin_sysc_sfp1_det;
 extern const struct gpio_pin pin_sysc_spi_sclk;
 extern const struct gpio_pin pin_sysc_spi_ncs;
+extern const struct gpio_pin pin_sysc_spi_ncs2;
 extern const struct gpio_pin pin_sysc_spi_mosi;
 extern const struct gpio_pin pin_sysc_spi_miso;
 extern const struct gpio_pin pin_sysc_fmc_scl;

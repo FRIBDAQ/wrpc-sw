@@ -55,6 +55,8 @@ const struct gpio_pin pin_sysc_spi_sclk = { &syscon_gpio, 10 };
 const struct gpio_pin pin_sysc_spi_ncs = { &syscon_gpio, 11 };
 const struct gpio_pin pin_sysc_spi_mosi = { &syscon_gpio, 12 };
 const struct gpio_pin pin_sysc_spi_miso = { &syscon_gpio, 13 };
+/* 2nd SPI chip-select (GPSR/GPCR bit 14, wr_core spi_cs2_o) */
+const struct gpio_pin pin_sysc_spi_ncs2 = { &syscon_gpio, 14 };
 
 #define FMC_I2C_DELAY 15
 #define SFP_I2C_DELAY 300
