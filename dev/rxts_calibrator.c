@@ -75,6 +75,7 @@ struct trans_detect_state {
 
 static struct trans_detect_state det_rising, det_falling;
 static int cal_cur_phase;
+static int cal_last_flip;
 
 /* finds the transition in the value of flip_bit and returns phase associated
    with it. If no transition phase has been found yet, returns 0. Non-zero
@@ -126,6 +127,7 @@ static void lookup_transition(struct trans_detect_state *state, int flip_bit,
 void calib_t24p_init(void)
 {
 	cal_cur_phase = 0;
+	cal_last_flip = -1;
 	det_rising.state = det_falling.state = TD_WAIT_INACTIVE;
 	det_rising.sample_count = 0;
 	det_falling.sample_count = 0;
@@ -149,7 +151,10 @@ static int rxts_calibration_update(uint32_t *t24p_value)
 	   ahead of rising edge counter */
 	int flip = ep_timestamper_cal_pulse(&wrc_endpoint_dev);
 
-	phy_dbg("RXTS calib:%dps flip:%d\n", cal_cur_phase, flip);
+	/* log only the flip transitions, not every 100ps step */
+	if (cal_last_flip < 0 || flip != cal_last_flip)
+		phy_dbg("RXTS calib:%dps flip:%d\n", cal_cur_phase, flip);
+	cal_last_flip = flip;
 
 	/* look for transitions (with deglitching) */
 	lookup_transition(&det_rising, flip, cal_cur_phase, 1);
