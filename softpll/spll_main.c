@@ -123,9 +123,16 @@ void mpll_init(struct spll_main_state *s, int id_ref, int id_out)
 
 	s->freq_prelock_gain_boost = MPLL_FREQ_PRELOCK_GAIN_BOOST;
 
-	s->phase_ld.threshold = 2000; //4 * (1 << 14); 
+	s->phase_ld.threshold = 2000; //4 * (1 << 14);
 	s->phase_ld.lock_samples = 1000;
-	s->phase_ld.delock_samples = 100;
+	/* On the CTS RXPI direct-tag path, each (re)lock has a one-sided
+	   frequency/phase re-acquisition transient (~1800 samples, err up to
+	   ~0.6 UI).  With the old delock=100 phase_ld bailed mid-transient and
+	   RX_READY re-init'd freq_ld, producing a self-sustaining relock churn.
+	   8192 rides through the transient once so the loop settles and holds.
+	   This only lengthens genuine-unlock detection; hard link loss is caught
+	   by the PHY link-down path in phy_calibration_poll. */
+	s->phase_ld.delock_samples = 8192;
 
 	s->id_ref = id_ref;
 	s->id_out = id_out;
