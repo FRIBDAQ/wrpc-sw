@@ -8,6 +8,7 @@
  */
 #include <inttypes.h>
 #include "wrc.h"
+#include "lpdc.h"
 
 #include "board.h"
 #include "softpll_ng.h"
@@ -206,19 +207,58 @@ int measure_t24p(void)
 	uint32_t value;
 
 	pp_printf("Waiting for link...\n");
-	while (!ep_link_up(&wrc_endpoint_dev, NULL))
+	while (!ep_link_up(&wrc_endpoint_dev, NULL)) {
+		/* This shell command blocks the task loop, but on the RXPI
+		   PHY the driver FSM (phy_calibration_poll, normally the
+		   "phy-cal" task) is what re-arms mpll.link_up/rxpi_ready
+		   and re-runs the sweep after the spll_init below.  Without
+		   servicing it here, mpll.locked can never assert and the
+		   setpoint shifter stalls forever (the old symptom: the scan
+		   hung right after the first sample). */
+		phy_calibration_poll();
 		timer_delay_ms(100);
+	}
 
 	spll_init(SPLL_MODE_SLAVE, 0, 0);
 	pp_printf("Locking PLL...\n");
-	while (!spll_check_lock(0))
+	while (!spll_check_lock(0)) {
+		phy_calibration_poll();
 		timer_delay_ms(100);
+	}
 	pp_printf("\n");
 
 	pp_printf("Calibrating RX timestamper...\n");
 	calib_t24p_init();
 
-	while (!(rv = rxts_calibration_update(&value))) ;
+	{
+		/* Stall watchdog: if the phase shifter makes no progress for
+		   ~4s, dump the softpll state instead of hanging forever. */
+		uint32_t last_tics = timer_get_tics();
+		int last_phase = cal_cur_phase;
+
+		while (!(rv = rxts_calibration_update(&value))) {
+			phy_calibration_poll();
+			if (cal_cur_phase != last_phase) {
+				last_phase = cal_cur_phase;
+				last_tics = timer_get_tics();
+			} else if (time_after(timer_get_tics(),
+					      last_tics + 4000)) {
+				pp_printf("RXTS calibration STALLED at %dps: "
+					  "mpll locked:%d phase_ld:%d "
+					  "rxpi_ready:%d link_up:%d seq:%d "
+					  "shift cur:%d tgt:%d\n",
+					  cal_cur_phase,
+					  softpll.mpll.locked,
+					  softpll.mpll.phase_ld.locked,
+					  softpll.mpll.rxpi_ready,
+					  softpll.mpll.link_up,
+					  softpll.seq_state,
+					  (int)softpll.mpll.phase_shift_current,
+					  (int)softpll.mpll.phase_shift_target);
+				return -1;
+			}
+		}
+	}
 
 	if (rv < 0)
 	  return rv;
