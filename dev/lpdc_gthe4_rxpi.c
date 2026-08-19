@@ -44,6 +44,14 @@ enum rx_fsm_state {
     /* Out of reset, wait for commas */
     RX_WAIT_COMMA,
     RX_WAIT_SEQ,
+    /* Master role only: wait until the RX clock is syntonized (remote slave
+       locked to us) before sweeping - detected as a stationary ptracker
+       phase.  The mpll never locks on a master, so RX_WAIT_MPLL would wait
+       forever and the sweep would never calibrate ptrackers[0].offset; but
+       that offset de-quantizes EVERY rx timestamp (lib/net.c raw_phase),
+       including t4 of the delay measurement, so without it crtt scatters by
+       up to one 16ns clock period per relink -> PPS offset scatters ~8ns. */
+    RX_WAIT_SYNTON,
     /* Comma detected and at correct alignment */
     RX_WAIT_MPLL,
     RX_SWEEP_WAIT,
@@ -58,6 +66,16 @@ enum rx_fsm_state {
 
 /* Number of clock edge to sample for a sweep step */
 #define NBR_SWEEP_SAMPLES 10240
+
+/* Master-role syntonization detector (RX_WAIT_SYNTON): the ptracker phase
+   must move less than TOL_PS between two samples CHECK_MS apart, COUNT times
+   in a row.  A free-running remote slave drifts ~us/500ms (aliasing below TOL
+   three consecutive times is ~1e-5); a locked one wanders a few ps. */
+#define RXPI_SYNTON_CHECK_MS 500
+#define RXPI_SYNTON_TOL_PS 200
+#define RXPI_SYNTON_COUNT 3
+/* One refclk period in ps: ptracker phase wraps here. */
+#define RXPI_REF_PERIOD_PS 16000
 
 struct sweep_state {
     unsigned char state;
@@ -76,6 +94,9 @@ struct rx_state {
     timeout_t timeout;
     unsigned reset_iter;
     struct sweep_state sweep;
+    /* Syntonization detector (master role) */
+    int32_t synt_phase;
+    unsigned char synt_cnt;
 };
 
 static void rxpi_sweep_init(struct sweep_state *state)
@@ -225,7 +246,8 @@ int phy_calibration_poll(void)
 	    phy_dbg("reset rx\n");
 	    regs->reset |= RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
 	    regs->ctrl &= ~RXPI_GTHE4_MAP_CTRL_RDY;
-	    tmo_init(&rx_state.timeout, 20 + rx_state.reset_iter++);
+	    tmo_init(&rx_state.timeout, 20 + rx_state.reset_iter);
+	    if (rx_state.reset_iter < 30) rx_state.reset_iter++;
 	    rx_state.state = RX_WAIT_RESET;
 	}
 	/* Main pll is not locked. */
@@ -237,32 +259,96 @@ int phy_calibration_poll(void)
     case RX_WAIT_RESET:
 	if (tmo_expired(&rx_state.timeout)) {
 	    regs->reset &= ~RXPI_GTHE4_MAP_RESET_GTH_RX_PMA_RST;
+	    /* Window for the gateware comma-steering FSM (PCS rxslide) to
+	       walk the comma to the fixed target tap 0 and assert PHY_READY
+	       (worst case ~5 ms incl. buffbypass + CDR relock; 50 ms is
+	       ample).  If it never asserts (stuck acquisition, dead peer
+	       TX), re-throw with another RX PMA reset as a safety net. */
+	    tmo_init(&rx_state.timeout, 50);
 	    rx_state.state = RX_WAIT_COMMA;
 	}
 	break;
     case RX_WAIT_COMMA:
-	if (status & RXPI_GTHE4_MAP_STATUS_PHY_READY) {
+	if (!(status & RXPI_GTHE4_MAP_STATUS_PHY_READY)) {
+	    if (tmo_expired(&rx_state.timeout))
+		rx_state.state = RX_RESET;   /* re-throw: try another tap */
+	}
+	else {
 	    unsigned bitslide = regs->bitslide;
 	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
 		       SPLL_DBG_EVT_PHY_READY, 1);
 	    phy_dbg("comma-aligned:%08x slide:%u\n", status, bitslide);
-	    if (bitslide & 1) {
-		/* Try again */
-		rx_state.state = RX_RESET;
-	    }
-	    else {
+	    /* bitslide[4:0] is now the REAL PCS slide count (0..19; the UI
+	       latency term compensated via the endpoint/PPSi bitslide path).
+	       Any value is acceptable - the comma always ends at tap 0.  The
+	       old GTX-era "reject odd bitslide" re-throw is GONE: it would
+	       reject odd slide counts forever. */
+	    {
+		struct wr_endpoint_device* dev = &wrc_endpoint_dev;
+		unsigned mcr;
+
 		rx_state.state = RX_WAIT_SEQ;
 		softpll.mpll.rxpi_ready = 0;
 		regs->ctrl = RXPI_GTHE4_MAP_CTRL_RDY;
 		rx_state.reset_iter = 0;
 		softpll.mpll.link_up = 1;
+
+		/* Restart auto-negotiation now that the PHY has aligned the
+		   comma to tap 0.  ep_reset_phy kicked AN once at boot, long
+		   before the LPDC comma-steering reached tap 0, so it never
+		   completed and the Ethernet link stayed down (SoftPLL locks
+		   off the direct tag regardless).  See
+		   doc/lpdc-rxpi-phase-matching.md wall #5. */
+		mcr = EP_MDIO_MCR_SPEED1000 | EP_MDIO_MCR_FULLDPLX;
+		if (dev->flags & EP_DEV_AUTONEG_ENABLED)
+		    mcr |= EP_MDIO_MCR_ANENABLE | EP_MDIO_MCR_ANRESTART;
+		ep_pcs_write(dev, EP_MDIO_MCR, mcr);
 	    }
 	}
 	break;
 
     case RX_WAIT_SEQ:
-	if (softpll.seq_state == SEQ_WAIT_MAIN)
-	    rx_state.state = RX_WAIT_MPLL;
+	if (softpll.mode == SPLL_MODE_SLAVE) {
+	    if (softpll.seq_state == SEQ_WAIT_MAIN)
+		rx_state.state = RX_WAIT_MPLL;
+	}
+	else if (softpll.seq_state == SEQ_READY) {
+	    /* Master: never reaches SEQ_WAIT_MAIN and the mpll never locks,
+	       so wait for RX syntonization instead (see RX_WAIT_SYNTON). */
+	    if (spll_read_ptracker(0, &rx_state.synt_phase, NULL)) {
+		rx_state.synt_cnt = 0;
+		tmo_init(&rx_state.timeout, RXPI_SYNTON_CHECK_MS);
+		rx_state.state = RX_WAIT_SYNTON;
+	    }
+	}
+	break;
+
+    case RX_WAIT_SYNTON:
+	if (tmo_expired(&rx_state.timeout)) {
+	    int32_t ph, d;
+
+	    if (!spll_read_ptracker(0, &ph, NULL))
+		break;
+	    d = ph - rx_state.synt_phase;
+	    if (d > RXPI_REF_PERIOD_PS / 2)
+		d -= RXPI_REF_PERIOD_PS;
+	    if (d < -RXPI_REF_PERIOD_PS / 2)
+		d += RXPI_REF_PERIOD_PS;
+	    if (d < 0)
+		d = -d;
+	    rx_state.synt_phase = ph;
+	    tmo_init(&rx_state.timeout, RXPI_SYNTON_CHECK_MS);
+	    if (d >= RXPI_SYNTON_TOL_PS) {
+		rx_state.synt_cnt = 0;
+	    }
+	    else if (++rx_state.synt_cnt >= RXPI_SYNTON_COUNT) {
+		phy_dbg("rx syntonized, start sweep (master)!\n");
+		spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
+			   SPLL_DBG_EVT_SWEEP_START, 1);
+		rxpi_sweep_init(&rx_state.sweep);
+		rx_state.state = RX_SWEEP_WAIT;
+	    }
+	}
 	break;
 
     case RX_WAIT_MPLL:
@@ -282,16 +368,27 @@ int phy_calibration_poll(void)
 		       SPLL_DBG_EVT_SWEEP_DONE, 1);
 	    pp_printf("rxpi: set ptrackers[0] offset: 0x%x\n",
 		      rx_state.sweep.delta);
-	    /* Disable the mpll for atomic changes */
-	    softpll.mpll.enabled = 0;
-	    softpll.mpll.phase_shift_current = rx_state.sweep.abs_phase;
-	    softpll.mpll.phase_shift_target = 0;
-	    softpll.ptrackers[0].offset = -rx_state.sweep.delta;
-	    softpll.ptrackers[0].preserve_sign = 1 << 2;
-	    softpll.ptrackers[0].sign_offset = 0;
+	    if (softpll.mode == SPLL_MODE_SLAVE) {
+		/* Disable the mpll for atomic changes */
+		softpll.mpll.enabled = 0;
+		softpll.mpll.phase_shift_current = rx_state.sweep.abs_phase;
+		softpll.mpll.phase_shift_target = 0;
+		softpll.ptrackers[0].offset = -rx_state.sweep.delta;
+		softpll.ptrackers[0].preserve_sign = 1 << 2;
+		softpll.ptrackers[0].sign_offset = 0;
 
-	    softpll.mpll.rxpi_ready = 1;
-	    softpll.mpll.enabled = 1;
+		softpll.mpll.rxpi_ready = 1;
+		softpll.mpll.enabled = 1;
+	    }
+	    else {
+		/* Master: ONLY calibrate the ptracker zero (used to
+		   de-quantize the rx timestamps, esp. t4).  Never touch the
+		   mpll - the master's oscillator is the reference and must
+		   stay free-running. */
+		softpll.ptrackers[0].offset = -rx_state.sweep.delta;
+		softpll.ptrackers[0].preserve_sign = 1 << 2;
+		softpll.ptrackers[0].sign_offset = 0;
+	    }
 	    spll_debug(SPLL_DBG_SRC_RAW, SPLL_DBG_SIGNAL_EVENT,
 		       SPLL_DBG_EVT_SWEEP_DONE, 1);
 	    rx_state.state = RX_READY;
@@ -301,7 +398,10 @@ int phy_calibration_poll(void)
 	}
 	break;
     case RX_READY:
-	if (!softpll.mpll.phase_ld.locked) {
+	/* The relock check is slave-only: on a master the mpll is disabled
+	   and never "locked", and the calibration stays valid until the next
+	   PHY down/reset (handled at the top of this function). */
+	if (softpll.mode == SPLL_MODE_SLAVE && !softpll.mpll.phase_ld.locked) {
 	    phy_dbg("pll unlocked\n");
 	    softpll.mpll.enabled = 0;
 	    ld_init((spll_lock_det_t *)&softpll.mpll.phase_ld);
