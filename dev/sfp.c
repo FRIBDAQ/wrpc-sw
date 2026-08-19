@@ -104,10 +104,52 @@ int sfp_dom_update(void)
 	return 1;
 }
 
+/* Fetch SFP DB entry at 0-based position pos. Returns 0 on success. */
+static int sfp_db_get_entry(int pos, struct s_sfpinfo *out)
+{
+	int sfpcount = 1;
+	int i;
+
+	/* Iterate from 0: sfp_entry() only (re)reads the DB entry count
+	 * when called with pos == 0. */
+	for (i = 0; i < sfpcount; ++i) {
+		sfpcount = storage_get_sfp(out, SFP_GET, i);
+		if (sfpcount <= 0)
+			return -1;
+		if (i == pos)
+			return 0;
+	}
+	return -1;
+}
+
 int sfp_match(int force)
 {
+	uint32_t db_entry = 0;
+
 	if (!force && !sfp_present()) {
 		return -ENODEV;
+	}
+
+	/* CTS: the SFP I2C bus may be unusable, so the calibration parameter
+	 * 'sfp0' > 0 forces SFP DB entry N (1-based, as listed by 'sfp show'),
+	 * skipping the I2C read and part-number match. 0 or absent keeps the
+	 * normal I2C-based matching below. */
+	if (storage_get_calibration_parameter(CAL_PARAM_SFP_DB_ENTRY,
+					      &db_entry) == 0 && db_entry > 0) {
+		struct s_sfpinfo dbsfp;
+
+		if (sfp_db_get_entry((int)db_entry - 1, &dbsfp) == 0) {
+			sfp_info.sfp_params = dbsfp;
+			sfp_info.sfp_in_db = SFP_MATCHED;
+			pp_printf("SFP: forced DB entry %d (cal param 'sfp0')\n",
+				  (int)db_entry);
+			return 0;
+		}
+		/* No such entry: keep the hardcoded defaults. */
+		pp_printf("SFP: cal param 'sfp0'=%d, no such DB entry, "
+			  "using defaults\n", (int)db_entry);
+		sfp_info.sfp_in_db = SFP_NOT_MATCHED;
+		return -ENXIO;
 	}
 
 	/* Read sfp header info from SFP */

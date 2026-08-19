@@ -26,10 +26,23 @@ static const char * const calib_cmds[] =
 	 [0] = "force",
 	 [1] = "load",
 	 [2] = "setp",
+	 [3] = "delp",
 #ifdef CONFIG_CMD_CALIBRATION_SHOW
-	 [3] = "show",
+	 [4] = "show",
 #endif
 };
+
+static uint32_t param_name_to_id(const char *name)
+{
+	uint32_t param = 0;
+
+	param |= ((uint32_t)(name[0])) << 24;
+	param |= ((uint32_t)(name[1])) << 16;
+	param |= ((uint32_t)(name[2])) << 8;
+	param |= ((uint32_t)(name[3])) << 0;
+
+	return param;
+}
 
 int cmd_calibration(const char *args[])
 {
@@ -58,21 +71,40 @@ int cmd_calibration(const char *args[])
 		return 0;
 	case 2:
 	{
-		uint32_t param = 0;
-		param |= ((uint32_t)(args[1][0])) << 24;
-		param |= ((uint32_t)(args[1][1])) << 16;
-		param |= ((uint32_t)(args[1][2])) << 8;
-		param |= ((uint32_t)(args[1][3])) << 0;
+		uint32_t param;
+		int value;
 
-		int value = atoi(args[2]);
+		if (!args[1] || !args[2])
+			return -1;
+
+		param = param_name_to_id(args[1]);
+		value = atoi(args[2]);
 
 		pp_printf("Setting calibration parameter %s [0x%x] to %d\n",
 			  args[1], (unsigned int)param, value);
 		storage_set_calibration_parameter_and_save(param, value);
 		return 0;
 	}
-#ifdef CONFIG_CMD_CALIBRATION_SHOW
 	case 3:
+	{
+		uint32_t param;
+
+		if (!args[1])
+			return -1;
+
+		param = param_name_to_id(args[1]);
+
+		if (storage_remove_calibration_parameter(param)) {
+			pp_printf("No such calibration parameter: %s [0x%x]\n",
+				  args[1], (unsigned int)param);
+			return -1;
+		}
+		pp_printf("Removed calibration parameter %s [0x%x]\n",
+			  args[1], (unsigned int)param);
+		return storage_save_calibration();
+	}
+#ifdef CONFIG_CMD_CALIBRATION_SHOW
+	case 4:
 	{
 		wrc_cal_data_t *cal;
 		unsigned i;

@@ -33,6 +33,11 @@
 #define CAL_PARAM_CALIBRATION_DATE ASCII_TO_U32('d','a','t','e')
 #define CAL_PARAM_FPGA_DNA_0 ASCII_TO_U32('d','n','a','0')
 #define CAL_PARAM_COMMIT_SHA_0 ASCII_TO_U32('s','h','a','0')
+/* CTS: forced SFP DB entry selection when the SFP I2C bus is unusable.
+ * 0 (or absent) = normal I2C part-number matching; N > 0 = use SFP DB
+ * entry N directly (1-based, same numbering as 'sfp show').
+ * Set from the shell with 'calibration setp sfp0 <N>'. */
+#define CAL_PARAM_SFP_DB_ENTRY ASCII_TO_U32('s','f','p','0')
 
 #define SFP_SECTION_PATTERN 0xdeadbeef
 
